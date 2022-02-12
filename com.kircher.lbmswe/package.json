@@ -1,0 +1,22 @@
+{
+  "name": "com.kircher.lbmswe",
+  "version": "1.0.0",
+  "displayName": "Lattice Boltzmann Method (SWE)",
+  "description": "A Lattice Boltzmann methods simulator for shallow water flows using a D2Q9 model.",
+  "unity": "2021.2",
+  "licenses": "MIT",
+  "dependencies": {
+     "com.unity.burst": "1.6.4",
+     "com.unity.mathematics": "1.2.5",
+     "com.unity.collections": "1.1.0"
+  },
+  "keywords": [
+     "lbm",
+     "lattice",
+     "boltzmann"
+   ],
+   "author": {
+     "name": "Brian Kircher",
+     "url": "https://www.github.com"
+   }
+}
