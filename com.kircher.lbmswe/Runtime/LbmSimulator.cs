@@ -6,7 +6,7 @@ using Unity.Mathematics;
 using UnityEngine;
 
 [ExecuteInEditMode]
-public class LbmSimulation : MonoBehaviour
+public class LbmSimulator : MonoBehaviour
 {
     private const float GravitationalForce = 9.8f;
     private const float Sqrt2 = 1.41421356237f;
