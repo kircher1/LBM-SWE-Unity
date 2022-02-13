@@ -1,7 +1,7 @@
 {
   "name": "com.kircher.lbmswe",
   "version": "1.0.0",
-  "displayName": "Lattice Boltzmann Method (SWE)",
+  "displayName": "Lattice Boltzmann Methods (SWE)",
   "description": "A Lattice Boltzmann methods simulator for shallow water flows using a D2Q9 model.",
   "unity": "2021.2",
   "licenses": "MIT",
