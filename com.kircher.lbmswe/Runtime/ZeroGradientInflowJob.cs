@@ -2,44 +2,47 @@
 using Unity.Collections;
 using Unity.Jobs;
 
-/// <summary>
-/// Computes missing inlet link distributions by copying from neighboring column.
-/// </summary>
-[BurstCompile]
-public struct ZeroGradientInflowJob : IJob
+namespace LatticeBoltzmannMethods
 {
-    [ReadOnly]
-    private int _latticeWidth;
-    [ReadOnly]
-    private int _latticeHeight;
-    [ReadOnly]
-    private NativeArray<bool> _solid;
-
-    private NativeArray<float> _distribution;
-
-    public ZeroGradientInflowJob(
-        int latticeWidth,
-        int latticeHeight,
-        NativeArray<bool> solid,
-        NativeArray<float> distribution)
+    /// <summary>
+    /// Computes missing inlet link distributions by copying from neighboring column.
+    /// </summary>
+    [BurstCompile]
+    public struct ZeroGradientInflowJob : IJob
     {
-        _latticeWidth = latticeWidth;
-        _latticeHeight = latticeHeight;
-        _solid = solid;
-        _distribution = distribution;
-    }
+        [ReadOnly]
+        private int _latticeWidth;
+        [ReadOnly]
+        private int _latticeHeight;
+        [ReadOnly]
+        private NativeArray<bool> _solid;
 
-    public void Execute()
-    {
-        for (var rowIdx = 0; rowIdx < _latticeHeight; rowIdx++)
+        private NativeArray<float> _distribution;
+
+        public ZeroGradientInflowJob(
+            int latticeWidth,
+            int latticeHeight,
+            NativeArray<bool> solid,
+            NativeArray<float> distribution)
         {
-            var nodeIdx = rowIdx * _latticeWidth;
-            if (!_solid[nodeIdx] && !_solid[nodeIdx + 1])
+            _latticeWidth = latticeWidth;
+            _latticeHeight = latticeHeight;
+            _solid = solid;
+            _distribution = distribution;
+        }
+
+        public void Execute()
+        {
+            for (var rowIdx = 0; rowIdx < _latticeHeight; rowIdx++)
             {
-                var neighborNodeIdx = nodeIdx + 1;
-                _distribution[9 * nodeIdx + 1] = _distribution[9 * neighborNodeIdx + 1];
-                _distribution[9 * nodeIdx + 2] = _distribution[9 * neighborNodeIdx + 2];
-                _distribution[9 * nodeIdx + 8] = _distribution[9 * neighborNodeIdx + 8];
+                var nodeIdx = rowIdx * _latticeWidth;
+                if (!_solid[nodeIdx] && !_solid[nodeIdx + 1])
+                {
+                    var neighborNodeIdx = nodeIdx + 1;
+                    _distribution[9 * nodeIdx + 1] = _distribution[9 * neighborNodeIdx + 1];
+                    _distribution[9 * nodeIdx + 2] = _distribution[9 * neighborNodeIdx + 2];
+                    _distribution[9 * nodeIdx + 8] = _distribution[9 * neighborNodeIdx + 8];
+                }
             }
         }
     }

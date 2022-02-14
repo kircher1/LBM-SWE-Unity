@@ -3,26 +3,29 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 
-[BurstCompile]
-public struct CopyJob : IJob
+namespace LatticeBoltzmannMethods
 {
-    [ReadOnly]
-    private NativeArray<float> _src;
-    private NativeArray<float> _dst;
-
-    public CopyJob(NativeArray<float> src, NativeArray<float> dst)
+    [BurstCompile]
+    public struct CopyJob : IJob
     {
-        if (dst.Length < src.Length)
+        [ReadOnly]
+        private NativeArray<float> _src;
+        private NativeArray<float> _dst;
+
+        public CopyJob(NativeArray<float> src, NativeArray<float> dst)
         {
-            throw new ArgumentException(nameof(src));
+            if (dst.Length < src.Length)
+            {
+                throw new ArgumentException(nameof(src));
+            }
+
+            _src = src;
+            _dst = dst;
         }
 
-        _src = src;
-        _dst = dst;
-    }
-
-    public void Execute()
-    {
-        NativeArray<float>.Copy(_src, _dst, _src.Length);
+        public void Execute()
+        {
+            NativeArray<float>.Copy(_src, _dst, _src.Length);
+        }
     }
 }
