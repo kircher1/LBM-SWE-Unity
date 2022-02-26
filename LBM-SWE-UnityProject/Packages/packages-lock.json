@@ -20,7 +20,7 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.collab-proxy": {
-      "version": "1.15.12",
+      "version": "1.15.13",
       "depth": 0,
       "source": "registry",
       "dependencies": {
@@ -58,7 +58,7 @@
       "source": "builtin",
       "dependencies": {
         "com.unity.ide.visualstudio": "2.0.14",
-        "com.unity.ide.rider": "3.0.9",
+        "com.unity.ide.rider": "3.0.12",
         "com.unity.ide.vscode": "1.2.4",
         "com.unity.editorcoroutines": "1.0.0",
         "com.unity.performance.profile-analyzer": "1.1.1",
@@ -105,6 +105,15 @@
       "dependencies": {},
       "url": "https://packages.unity.com"
     },
+    "com.unity.recorder": {
+      "version": "3.0.3",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.timeline": "1.0.0"
+      },
+      "url": "https://packages.unity.com"
+    },
     "com.unity.services.core": {
       "version": "1.0.1",
       "depth": 1,
@@ -122,7 +131,7 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.test-framework": {
-      "version": "1.1.30",
+      "version": "1.1.31",
       "depth": 0,
       "source": "registry",
       "dependencies": {

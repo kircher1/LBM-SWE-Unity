@@ -24,6 +24,9 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
-    m_Floats: []
+    m_Floats:
+    - _FreeChannelScale: 1.6
+    - _LengthScale: 0.16
+    - _VelocityScale: 0.57
     m_Colors: []
   m_BuildTextureStacks: []
