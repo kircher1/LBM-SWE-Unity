@@ -139,9 +139,6 @@ namespace LatticeBoltzmannMethods
         {
             FillLinkData(out _linkDirection, out _linkOffsetX, out _linkOffsetY);
 
-            var aspectRatio = (float)_latticeWidth / _latticeHeight;
-            transform.localScale = new Vector3(aspectRatio, 1.0f, 1.0f);
-
             _markerTimer = _markerFrequency;
 
             InitializeSimData();
