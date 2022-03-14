@@ -76,5 +76,4 @@ public class LbmDebugViz : MonoBehaviour
         _maskRawImage.rectTransform.sizeDelta = new Vector2(e.width, e.height);
         _maskRawImage.GetComponent<AspectRatioFitter>().aspectRatio = e.width / (float)e.height;
     }
-
 }

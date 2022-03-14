@@ -26,8 +26,12 @@ namespace LatticeBoltzmannMethods
         [SerializeField]
         private int _latticeWidth = 65;
 
+        public int LatticeWidth => _latticeWidth;
+
         [SerializeField]
         private int _latticeHeight = 193;
+
+        public int LatticeHeight => _latticeHeight;
 
         [SerializeField]
         private float _startingHeight = 0.1f;
@@ -345,23 +349,28 @@ namespace LatticeBoltzmannMethods
         public void AddSolidNodeCluster(float2 uv)
         {
             // UV -> row,col
-            var colRowIdx = math.saturate(uv) * new float2(_latticeWidth - 1, _latticeHeight - 1);
-            var rowIdx = (int)math.round(colRowIdx.y);
-            var colIdx = (int)math.round(colRowIdx.x);
+            var colRowIdx = math.int2(math.round(math.saturate(uv) * new float2(_latticeWidth - 1, _latticeHeight - 1)));
+            var rowIdx = colRowIdx.y;
+            var colIdx = colRowIdx.x;
 
             // Write area of solid pixels.
-            AddSolidNode(rowIdx - 1, colIdx - 0);
-            AddSolidNode(rowIdx + 0, colIdx - 1);
-            AddSolidNode(rowIdx + 0, colIdx - 0);
-            AddSolidNode(rowIdx + 0, colIdx + 1);
-            AddSolidNode(rowIdx + 1, colIdx - 0);
+            AddSolidNode(math.int2(colIdx - 0, rowIdx - 1));
+            AddSolidNode(math.int2(colIdx - 1, rowIdx + 0));
+            AddSolidNode(math.int2(colIdx - 0, rowIdx + 0));
+            AddSolidNode(math.int2(colIdx + 1, rowIdx + 0));
+            AddSolidNode(math.int2(colIdx - 0, rowIdx + 1));
         }
 
-        private void AddSolidNode(int rowIdx, int colIdx)
+        public void AddSolidNode(float2 uv)
         {
-            rowIdx = math.clamp(rowIdx, 0, _latticeHeight - 1);
-            colIdx = math.clamp(colIdx, 0, _latticeWidth - 1);
-            var nodeIdx = rowIdx * _latticeWidth + colIdx;
+            var colRowIdx = math.int2(math.round(math.saturate(uv) * new float2(_latticeWidth - 1, _latticeHeight - 1)));
+            AddSolidNode(colRowIdx);
+        }
+
+        private void AddSolidNode(int2 colRowIdx)
+        {
+            var clampedColRowIdx = math.clamp(colRowIdx, math.int2(0), math.int2(_latticeWidth - 1, _latticeHeight - 1));
+            var nodeIdx = clampedColRowIdx.y * _latticeWidth + clampedColRowIdx.x;
 
             _solid[nodeIdx] = true;
 
