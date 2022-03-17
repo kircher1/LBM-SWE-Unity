@@ -60,6 +60,19 @@ namespace LatticeBoltzmannMethods
         [SerializeField]
         private bool _usePeriodicBoundary = false;
 
+        /// <summary>
+        /// Flood fills solid nodes with the average of non-solid neighboring heights.
+        /// Does not affect the simulation.
+        /// </summary>
+        [SerializeField]
+        private bool _fixupSolidHeights = false;
+
+        /// <summary>
+        /// Flood fills solid nodes with the average of non-solid neighboring heights.
+        /// Does not affect the simulation.
+        /// </summary>
+        public bool FixupSolidHeights { get => _fixupSolidHeights; set => _fixupSolidHeights = value; }
+
         [SerializeField]
         private bool _showMarkers = true;
 
@@ -307,7 +320,13 @@ namespace LatticeBoltzmannMethods
                     //new ZeroGradientInflowJob(_latticeWidth, _latticeHeight, _solid, _newDistribution).Schedule(streamJobHandle);
                     new ZhouHeInflowJob(_latticeWidth, _latticeHeight, _inverseE, _solid, _initialHeight, _initialVelocity, _newDistribution).Schedule(streamJobHandle);
             var computeVelocityAndHeightJobHandle = computeVelocityAndHeightJob.Schedule(inflowJobHandle);
-            var computeEquilibriumDistributionJobHandle = computeEquilibriumDistributionJob.Schedule(computeVelocityAndHeightJobHandle);
+            JobHandle? floodHeightsJobHandle = null;
+            if (_fixupSolidHeights)
+            {
+                var floodHeightsJob = new FloodSolidHeightsJob(_latticeWidth, _latticeHeight, _solid, _height);
+                floodHeightsJobHandle = floodHeightsJob.Schedule(computeVelocityAndHeightJobHandle);
+            }
+            var computeEquilibriumDistributionJobHandle = computeEquilibriumDistributionJob.Schedule(floodHeightsJobHandle ?? computeVelocityAndHeightJobHandle);
             var updateForcesJobHandle = updateForcesJob.Schedule(_latticeHeight, 1, computeEquilibriumDistributionJobHandle);
 
             // Copy new distribution to the last distribution.
@@ -367,7 +386,7 @@ namespace LatticeBoltzmannMethods
             AddSolidNode(colRowIdx);
         }
 
-        private void AddSolidNode(int2 colRowIdx)
+        public void AddSolidNode(int2 colRowIdx)
         {
             var clampedColRowIdx = math.clamp(colRowIdx, math.int2(0), math.int2(_latticeWidth - 1, _latticeHeight - 1));
             var nodeIdx = clampedColRowIdx.y * _latticeWidth + clampedColRowIdx.x;
@@ -506,7 +525,7 @@ namespace LatticeBoltzmannMethods
 
             var pixelData = _heightTexture.GetPixelData<float>(0);
             var adjustedMax = _textureScale * maxHeight;
-            var updateHeightTextureJob = new UpdateHeightTextureJob(_latticeWidth, adjustedMax, _solid, _height, pixelData);
+            var updateHeightTextureJob = new UpdateHeightTextureJob(_latticeWidth, adjustedMax, _height, pixelData);
             var jobHandle = updateHeightTextureJob.Schedule(_latticeHeight, 1);
             jobHandle.Complete();
             _heightTexture.Apply(false, false);

@@ -690,6 +690,7 @@ MonoBehaviour:
   _smagorinskyConstant: 0.18
   _textureScale: 1
   _usePeriodicBoundary: 0
+  _fixupSolidHeights: 0
   _showMarkers: 1
   _markerPrefab: {fileID: 0}
   _markerFrequency: 5
