@@ -15,9 +15,9 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private NativeArray<float> _waterHeight;
         [NativeDisableParallelForRestriction]
-        private NativeArray<float> _destination;
+        private NativeArray<half> _destination;
 
-        public UpdateHeightTextureJob(int textureWidth, float maxHeight, NativeArray<float> waterHeight, NativeArray<float> destination)
+        public UpdateHeightTextureJob(int textureWidth, float maxHeight, NativeArray<float> waterHeight, NativeArray<half> destination)
         {
             _textureWidth = textureWidth;
             _maxHeight = maxHeight;
@@ -31,7 +31,7 @@ namespace LatticeBoltzmannMethods
             for (var idx = startIdx; idx < startIdx + _textureWidth; ++idx)
             {
                 var height = _waterHeight[idx];
-                _destination[idx] = math.saturate(height / _maxHeight);
+                _destination[idx] = (half)math.saturate(height / _maxHeight);
             }
         }
     }

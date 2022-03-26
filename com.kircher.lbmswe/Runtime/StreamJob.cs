@@ -75,13 +75,12 @@ namespace LatticeBoltzmannMethods
                 }
             }
 
-            // Handle missing distributions at inlet/outlet. Assumes velocity.y = 0 at inlet and outlet.
+            // Handle missing distributions at outlet.
             // TODO: Separate job.
             if (!_usePeriodicBoundary)
             {
                 // var inverseE = 1.0f / e;
 
-                // Compute missing outlet link distribution.
                 for (var rowIdx = 0; rowIdx < _latticeHeight; rowIdx++)
                 {
                     var nodeIdx = rowIdx * _latticeWidth + _latticeWidth - 1;

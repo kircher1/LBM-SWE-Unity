@@ -7,6 +7,10 @@ using UnityEngine;
 
 namespace LatticeBoltzmannMethods
 {
+    // TODO: Optimization ideas
+    // - Ping-pong sim data and pick up result at the beginning of next frame and then start next sim.
+    // - Split link data into separate arrays. Then run equilibrium distribution jobs in parallel.
+
     [ExecuteInEditMode]
     public class LbmSimulator : MonoBehaviour
     {
@@ -17,7 +21,7 @@ namespace LatticeBoltzmannMethods
         private static readonly ValueTuple<JobHandle?, Texture2D, TextureEventHandler> NoTextureProcessedResult = (null, null, null);
 
         [SerializeField]
-        [Range(0.016f, 1f)]
+        [Range(0.016f, 1.0f)]
         private float _simulationStepTime = 0.016f;
 
         [SerializeField]
@@ -104,10 +108,13 @@ namespace LatticeBoltzmannMethods
         // Simulation data.
 
         private NativeArray<bool> _solid;
+        public NativeArray<bool> Solid => _solid;
         private NativeArray<float2> _velocity;
+        public NativeArray<float2> Velocity => _velocity;
         private NativeArray<float2> _force;
         private NativeArray<float2> _forceMinMaxResult;
         private NativeArray<float> _height;
+        public NativeArray<float> Height => _height;
         private NativeArray<float> _lastDistribution;
         private NativeArray<float> _newDistribution;
         private NativeArray<float> _equilibriumDistribution;
@@ -161,24 +168,43 @@ namespace LatticeBoltzmannMethods
             InitializeSimData();
         }
 
-        private void InitializeSimData()
+        private void InitializeNativeArrays()
         {
+            if (_solid.IsCreated)
+            {
+                return;
+            }
+
+            _solid = new NativeArray<bool>(_latticeWidth * _latticeHeight, Allocator.Persistent);
             _lastDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight * 9, Allocator.Persistent);
             _newDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight * 9, Allocator.Persistent);
             _equilibriumDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight * 9, Allocator.Persistent);
+            _height = new NativeArray<float>(_latticeWidth * _latticeHeight, Allocator.Persistent);
+            _velocity = new NativeArray<float2>(_latticeWidth * _latticeHeight, Allocator.Persistent);
+            _force = new NativeArray<float2>(_latticeWidth * _latticeHeight, Allocator.Persistent);
+        }
 
-            // Set solid rails.
-            _solid = new NativeArray<bool>(_latticeWidth * _latticeHeight, Allocator.Persistent);
-            for (var idx = 0; idx < _solid.Length; idx++)
+        private void InitializeSimData()
+        {
+            InitializeNativeArrays();
+
+            var startupLog = "LbmSimulator ---\r\n";
+
+            // Set solid rails unless some solid nodes have already been set by someone else.
+            if (!_solid.IsCreated)
             {
-                _solid[idx] = true;
-            }
-            for (var rowIdx = 1; rowIdx < _latticeHeight - 1; rowIdx++)
-            {
-                var rowStartIdx = rowIdx * _latticeWidth;
-                for (var colIdx = 0; colIdx < _latticeWidth; colIdx++)
+                startupLog += "Added solid rails\r\n";
+                for (var idx = 0; idx < _solid.Length; idx++)
                 {
-                    _solid[rowStartIdx + colIdx] = false;
+                    _solid[idx] = true;
+                }
+                for (var rowIdx = 1; rowIdx < _latticeHeight - 1; rowIdx++)
+                {
+                    var rowStartIdx = rowIdx * _latticeWidth;
+                    for (var colIdx = 0; colIdx < _latticeWidth; colIdx++)
+                    {
+                        _solid[rowStartIdx + colIdx] = false;
+                    }
                 }
             }
 
@@ -187,28 +213,25 @@ namespace LatticeBoltzmannMethods
             _inverseE = 1.0f / _e;
             MaxSpeed = math.abs(_e) - 0.001f;
             _maxHeight = _e * _e / GravitationalForce - 0.001f;
-            Debug.Log($"Max speed: {MaxSpeed}, Max height: {_maxHeight}");
+            startupLog += $"Max speed: {MaxSpeed}, Max height: {_maxHeight}\r\n";
 
             // Set starting height uniformly.
-            _height = new NativeArray<float>(_latticeWidth * _latticeHeight, Allocator.Persistent);
             _initialHeight = math.min(_maxHeight, _startingHeight);
-            Debug.Log($"Initial height: {_initialHeight}");
+            startupLog += $"Initial height: {_initialHeight}\r\n";
             for (var nodeIdx = 0; nodeIdx < _height.Length; nodeIdx++)
             {
-                _height[nodeIdx] = _initialHeight;
+                _height[nodeIdx] = _solid[nodeIdx] ? 0.0f : _initialHeight;
             }
 
             // Set initial velocity, some factor of the max speed.
             _initialVelocity = new float2((_startingHeight / _maxHeight) * MaxSpeed / Sqrt2, 0.0f);
-            Debug.Log($"Initial velocity: {_initialVelocity}");
-            _velocity = new NativeArray<float2>(_latticeWidth * _latticeHeight, Allocator.Persistent);
+            startupLog += $"Initial velocity: {_initialVelocity}\r\n";
             for (var nodeIdx = 0; nodeIdx < _velocity.Length; nodeIdx++)
             {
                 _velocity[nodeIdx] = _solid[nodeIdx] ? float2.zero : _initialVelocity;
             }
 
             // Compute force from initial height.
-            _force = new NativeArray<float2>(_latticeWidth * _latticeHeight, Allocator.Persistent);
             for (var nodeIdx = 0; nodeIdx < _height.Length; nodeIdx++)
             {
                 _force[nodeIdx] = _solid[nodeIdx] ? float2.zero : -GravitationalForce * _height[nodeIdx] * _bedSlope;
@@ -228,11 +251,15 @@ namespace LatticeBoltzmannMethods
                         _height,
                         _velocity,
                         _equilibriumDistribution);
-                var copyJob = new CopyJob(_equilibriumDistribution, _lastDistribution);
                 var computeEquilibriumDistributionJobHandle = computeEquilibriumDistributionJob.Schedule();
+
+                // Copy equilibrium distribution into the starting distribution (_lastDistribution).
+                var copyJob = new CopyJob(_equilibriumDistribution, _lastDistribution);
                 var copyJobHandle = copyJob.Schedule(computeEquilibriumDistributionJobHandle);
                 copyJobHandle.Complete();
             }
+
+            Debug.Log(startupLog);
         }
 
         private void Update()
@@ -388,13 +415,17 @@ namespace LatticeBoltzmannMethods
 
         public void AddSolidNode(int2 colRowIdx)
         {
+            if (!_solid.IsCreated)
+            {
+                InitializeNativeArrays();
+            }
+
             var clampedColRowIdx = math.clamp(colRowIdx, math.int2(0), math.int2(_latticeWidth - 1, _latticeHeight - 1));
             var nodeIdx = clampedColRowIdx.y * _latticeWidth + clampedColRowIdx.x;
 
             _solid[nodeIdx] = true;
 
-            //_newDistribution[idx, 0] += 1.0f / 5.0f;
-            for (var linkIdx = 0; linkIdx < 1 /* 9 */; linkIdx++)
+            for (var linkIdx = 0; linkIdx < 1; linkIdx++)
             {
                 _newDistribution[9 * nodeIdx + linkIdx] = 0.0f;
             }
@@ -518,12 +549,12 @@ namespace LatticeBoltzmannMethods
 
             if (_heightTexture == null)
             {
-                _heightTexture = new Texture2D(_latticeWidth, _latticeHeight, TextureFormat.RFloat, mipChain: false, linear: true);
+                _heightTexture = new Texture2D(_latticeWidth, _latticeHeight, TextureFormat.RHalf, mipChain: false, linear: true);
                 _heightTexture.hideFlags = HideFlags.HideAndDontSave;
                 _heightTexture.wrapMode = TextureWrapMode.Clamp;
             }
 
-            var pixelData = _heightTexture.GetPixelData<float>(0);
+            var pixelData = _heightTexture.GetPixelData<half>(0);
             var adjustedMax = _textureScale * maxHeight;
             var updateHeightTextureJob = new UpdateHeightTextureJob(_latticeWidth, adjustedMax, _height, pixelData);
             var jobHandle = updateHeightTextureJob.Schedule(_latticeHeight, 1);
