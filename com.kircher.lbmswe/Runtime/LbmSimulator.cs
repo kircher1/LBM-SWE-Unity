@@ -274,7 +274,6 @@ namespace LatticeBoltzmannMethods
                 new CollideJob(
                     _simulationStepTime,
                     _latticeWidth,
-                    _latticeHeight,
                     _e,
                     inverseESq,
                     _applyEddyRelaxationTime,
@@ -338,8 +337,8 @@ namespace LatticeBoltzmannMethods
             var fillNewDistributionJob = new FillJob(_newDistribution);
 
             // Schedule main simulation jobs.
-            var collideJobHandle = collideJob.Schedule();
-            var streamJobHandle = streamJob.Schedule(collideJobHandle);
+            var collideJobHandle = collideJob.Schedule(_latticeHeight, 1);
+            var streamJobHandle = streamJob.Schedule(_latticeHeight, 1, collideJobHandle);
             var inflowJobHandle =
                 _usePeriodicBoundary ?
                     streamJobHandle :

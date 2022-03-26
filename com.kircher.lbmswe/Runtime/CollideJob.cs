@@ -6,14 +6,12 @@ using Unity.Mathematics;
 namespace LatticeBoltzmannMethods
 {
     [BurstCompile]
-    public struct CollideJob : IJob
+    public struct CollideJob : IJobParallelFor
     {
         [ReadOnly]
         private float _deltaT;
         [ReadOnly]
         private int _latticeWidth;
-        [ReadOnly]
-        private int _latticeHeight;
         [ReadOnly]
         private float _e;
         [ReadOnly]
@@ -37,12 +35,12 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private NativeArray<float> _waterHeight;
 
+        [NativeDisableParallelForRestriction]
         private NativeArray<float> _distribution;
 
         public CollideJob(
             float deltaT,
             int latticeWidth,
-            int latticeHeight,
             float e,
             float inverseESq,
             bool applyEddyRelaxationTime,
@@ -58,7 +56,6 @@ namespace LatticeBoltzmannMethods
         {
             _deltaT = deltaT;
             _latticeWidth = latticeWidth;
-            _latticeHeight = latticeHeight;
             _e = e;
             _inverseESq = inverseESq;
             _applyEddyRelaxationTime = applyEddyRelaxationTime;
@@ -73,11 +70,13 @@ namespace LatticeBoltzmannMethods
             _distribution = distribution;
         }
 
-        public void Execute()
+        public void Execute(int rowIdx)
         {
             var inverseRelaxationTime = 1.0f / _relaxationTime;
-            for (var nodeIdx = 0; nodeIdx < _latticeWidth * _latticeHeight; nodeIdx++)
+            var rowStartIdx = rowIdx * _latticeWidth;
+            for (var colIdx = 0; colIdx < _latticeWidth; colIdx++)
             {
+                var nodeIdx = rowStartIdx + colIdx;
                 if (_solid[nodeIdx])
                 {
                     // bounce back

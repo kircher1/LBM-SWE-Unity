@@ -5,7 +5,6 @@ using Unity.Mathematics;
 
 namespace LatticeBoltzmannMethods
 {
-    // TODO: ParallelJob-ify
     [BurstCompile]
     public struct UpdateForcesJob : IJobParallelFor
     {
@@ -73,63 +72,62 @@ namespace LatticeBoltzmannMethods
             for (var colIdx = 0; colIdx < _latticeWidth; colIdx++)
             {
                 var nodeIdx = rowStartIdx + colIdx;
-                if (!_solid[nodeIdx])
-                {
-                    var gravitationalForce = float2.zero;
-                    var bedShearStress = float2.zero;
-                    var wallShearStress = float2.zero;
-
-                    // For each link, add the force term.
-                    for (var linkIdx = 1; linkIdx < 9; linkIdx++)
-                    {
-                        var linkOffsetX = _linkOffsetX[linkIdx];
-                        var linkOffsetY = _linkOffsetY[linkIdx];
-                        var neighborRowIdx = math.clamp(rowIdx + linkOffsetY, 0, _latticeHeight - 1);
-                        var neighborColIdx = math.clamp(colIdx + linkOffsetX, 0, _latticeWidth - 1);
-                        var neighborIdx = neighborRowIdx * _latticeWidth + neighborColIdx;
-
-                        var isWallNeighbor = _solid[neighborIdx];
-                        var currentHeight = _height[nodeIdx];
-                        var neighborWaterHeight = isWallNeighbor ? currentHeight : _height[neighborIdx];
-                        var height = 0.5f * (currentHeight + neighborWaterHeight);
-
-                        var velocity = _velocity[nodeIdx];
-
-                        var linkDirection = math.normalize(_linkDirection[linkIdx]);
-
-                        if (_applyShearForces)
-                        {
-                            var velocityDotDirection = math.max(0.0f, math.dot(velocity, linkDirection));
-                            var projectedVelocity = velocityDotDirection * velocity;
-                            var speed = math.length(projectedVelocity);
-                            var scaledVelocity = projectedVelocity * speed;
-
-                            var chezyCoefficient = math.pow(height, 1.0f / 6.0f) / BottomManningsCoefficient;
-                            var bedFrictionCoefficient = _gravitationalForce / (chezyCoefficient * chezyCoefficient);
-                            bedShearStress += scaledVelocity * bedFrictionCoefficient;
-
-                            if (isWallNeighbor)
-                            {
-                                var wallFrictionCoefficient = -_gravitationalForce * WallManningsCoefficient * WallManningsCoefficient / math.pow(height, 1.0f / 3.0f);
-                                wallShearStress += scaledVelocity * wallFrictionCoefficient;
-                            }
-                        }
-
-                        var bedSlopeDotDirection = math.dot(_bedSlope, linkDirection);
-                        gravitationalForce += _gravitationalForce * height * bedSlopeDotDirection * _bedSlope;
-
-                        // ?
-                        //gravitationalForce /= 9.0f;
-                        //bedShearStress /= 9.0f;
-                        //wallShearStress /= 9.0f;
-                    }
-
-                    _force[nodeIdx] = -gravitationalForce - bedShearStress + wallShearStress;
-                }
-                else
+                if (_solid[nodeIdx])
                 {
                     _force[nodeIdx] = float2.zero;
+                    continue;
                 }
+
+                var gravitationalForce = float2.zero;
+                var bedShearStress = float2.zero;
+                var wallShearStress = float2.zero;
+
+                // For each link, add the force term.
+                for (var linkIdx = 1; linkIdx < 9; linkIdx++)
+                {
+                    var linkOffsetX = _linkOffsetX[linkIdx];
+                    var linkOffsetY = _linkOffsetY[linkIdx];
+                    var neighborRowIdx = math.clamp(rowIdx + linkOffsetY, 0, _latticeHeight - 1);
+                    var neighborColIdx = math.clamp(colIdx + linkOffsetX, 0, _latticeWidth - 1);
+                    var neighborIdx = neighborRowIdx * _latticeWidth + neighborColIdx;
+
+                    var isWallNeighbor = _solid[neighborIdx];
+                    var currentHeight = _height[nodeIdx];
+                    var neighborWaterHeight = isWallNeighbor ? currentHeight : _height[neighborIdx];
+                    var height = 0.5f * (currentHeight + neighborWaterHeight);
+
+                    var velocity = _velocity[nodeIdx];
+
+                    var linkDirection = math.normalize(_linkDirection[linkIdx]);
+
+                    if (_applyShearForces)
+                    {
+                        var velocityDotDirection = math.max(0.0f, math.dot(velocity, linkDirection));
+                        var projectedVelocity = velocityDotDirection * velocity;
+                        var speed = math.length(projectedVelocity);
+                        var scaledVelocity = projectedVelocity * speed;
+
+                        var chezyCoefficient = math.pow(height, 1.0f / 6.0f) / BottomManningsCoefficient;
+                        var bedFrictionCoefficient = _gravitationalForce / (chezyCoefficient * chezyCoefficient);
+                        bedShearStress += scaledVelocity * bedFrictionCoefficient;
+
+                        if (isWallNeighbor)
+                        {
+                            var wallFrictionCoefficient = -_gravitationalForce * WallManningsCoefficient * WallManningsCoefficient / math.pow(height, 1.0f / 3.0f);
+                            wallShearStress += scaledVelocity * wallFrictionCoefficient;
+                        }
+                    }
+
+                    var bedSlopeDotDirection = math.dot(_bedSlope, linkDirection);
+                    gravitationalForce += _gravitationalForce * height * bedSlopeDotDirection * _bedSlope;
+
+                    // ?
+                    //gravitationalForce /= 9.0f;
+                    //bedShearStress /= 9.0f;
+                    //wallShearStress /= 9.0f;
+                }
+
+                _force[nodeIdx] = -gravitationalForce - bedShearStress + wallShearStress;
             }
         }
     }
