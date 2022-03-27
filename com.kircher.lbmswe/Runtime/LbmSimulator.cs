@@ -8,7 +8,6 @@ using UnityEngine;
 namespace LatticeBoltzmannMethods
 {
     // TODO: Optimization ideas
-    // - Ping-pong sim data and pick up result at the beginning of next frame and then start next sim.
     // - Split link data into separate arrays. Then run equilibrium distribution jobs in parallel.
 
     [ExecuteInEditMode]
@@ -92,6 +91,7 @@ namespace LatticeBoltzmannMethods
 
         public delegate void TextureEventHandler(object sender, Texture2D e);
 
+        public event EventHandler SimulationStepCompleted;
         public event TextureEventHandler FlowTextureUpdated;
         public event TextureEventHandler HeightTextureUpdated;
         public event TextureEventHandler MaskTextureUpdated;
@@ -108,23 +108,29 @@ namespace LatticeBoltzmannMethods
         private NativeArray<int> _linkOffsetY;
         public NativeArray<int> LinkOffsetY => _linkOffsetY;
 
-        // Simulation data.
-
+        // Simulation data. These are actively being updated frame to frame. Don't read from outside of jobs.
         private NativeArray<bool> _solid;
-        public NativeArray<bool> Solid => _solid;
         private NativeArray<float2> _velocity;
-        public NativeArray<float2> Velocity => _velocity;
         private NativeArray<float2> _force;
         private NativeArray<float2> _forceMinMaxResult;
         private NativeArray<float> _height;
-        public NativeArray<float> Height => _height;
         private NativeArray<float> _lastDistribution;
         private NativeArray<float> _newDistribution;
         private NativeArray<float> _equilibriumDistribution;
+        private ValueTuple<JobHandle, JobHandle>? _lastJobHandles = null;
+
+        // Sim result data. This is what can be queried by clients.
+        private NativeArray<bool> _solidResult;
+        public NativeArray<bool> Solid => _solidResult;
+        private NativeArray<float2> _velocityResult;
+        public NativeArray<float2> Velocity => _velocityResult;
+        private NativeArray<float> _heightResult;
+        public NativeArray<float> Height => _heightResult;
 
         private readonly List<GameObject> _markers = new List<GameObject>();
         private float _markerTimer = 1.0f;
 
+        // These are results of sim, which can be optionally generated.
         private Texture2D _flowTexture;
         private Texture2D _heightTexture;
         private Texture2D _maskTexture;
@@ -136,7 +142,7 @@ namespace LatticeBoltzmannMethods
         private float _initialHeight;
         private float2 _initialVelocity;
 
-        private static void FillLinkData(
+        private static void InitializeLinkData(
             out NativeArray<float2> linkDirection,
             out NativeArray<int> linkOffsetX,
             out NativeArray<int> linkOffsetY)
@@ -164,7 +170,7 @@ namespace LatticeBoltzmannMethods
 
         private void OnEnable()
         {
-            FillLinkData(out _linkDirection, out _linkOffsetX, out _linkOffsetY);
+            InitializeLinkData(out _linkDirection, out _linkOffsetX, out _linkOffsetY);
 
             _markerTimer = _markerFrequency;
 
@@ -185,6 +191,10 @@ namespace LatticeBoltzmannMethods
             _height = new NativeArray<float>(_latticeWidth * _latticeHeight, Allocator.Persistent);
             _velocity = new NativeArray<float2>(_latticeWidth * _latticeHeight, Allocator.Persistent);
             _force = new NativeArray<float2>(_latticeWidth * _latticeHeight, Allocator.Persistent);
+
+            _solidResult = new NativeArray<bool>(_latticeWidth * _latticeHeight, Allocator.Persistent);
+            _heightResult = new NativeArray<float>(_latticeWidth * _latticeHeight, Allocator.Persistent);
+            _velocityResult = new NativeArray<float2>(_latticeWidth * _latticeHeight, Allocator.Persistent);
         }
 
         private void InitializeSimData()
@@ -193,8 +203,8 @@ namespace LatticeBoltzmannMethods
 
             var startupLog = "LbmSimulator ---\r\n";
 
-            // Set solid rails unless some solid nodes have already been set by someone else.
-            if (!_solid.IsCreated)
+            // Fill in solid rails unless along top and bottom edge unless some solid nodes have already been set by someone else.
+            if (!_solidResult.IsCreated)
             {
                 startupLog += "Added solid rails\r\n";
                 for (var idx = 0; idx < _solid.Length; idx++)
@@ -209,6 +219,10 @@ namespace LatticeBoltzmannMethods
                         _solid[rowStartIdx + colIdx] = false;
                     }
                 }
+            }
+            else
+            {
+                NativeArray<bool>.Copy(_solidResult, _solid);
             }
 
             // Compute per-simulation terms.
@@ -266,6 +280,27 @@ namespace LatticeBoltzmannMethods
 
         private void Update()
         {
+            if (_lastJobHandles != null)
+            {
+                _lastJobHandles.Value.Item1.Complete();
+                _lastJobHandles.Value.Item2.Complete();
+                _lastJobHandles = null;
+
+                // Copy sim data to results.
+                NativeArray<float>.Copy(_height, _heightResult);
+                NativeArray<float2>.Copy(_velocity, _velocityResult);
+
+                // And copy latest solid to sim solid. Now is safe to do this.
+                NativeArray<bool>.Copy(_solidResult, _solid);
+
+                SimulationStepCompleted?.Invoke(this, new EventArgs());
+
+                // After jobs complete, update any textures and markers.
+                UpdateTextures(_maxHeight, MaxSpeed);
+                UpdateMarkers(); // TODO: Jobify/move to different component.
+                DumpStats(); // TODO: Jobify/move to different component.
+            }
+
             // Compute per-frame terms.
             var inverseESq = 1.0f / (_e * _e);
             var smagorinskyConstantSq = _smagorinskyConstant * _smagorinskyConstant;
@@ -336,7 +371,7 @@ namespace LatticeBoltzmannMethods
             var copyNewDistributionToLastDistributionJob = new CopyJob(_newDistribution, _lastDistribution);
             var fillNewDistributionJob = new FillJob(_newDistribution);
 
-            // Schedule main simulation jobs.
+            // Schedule simulation jobs.
             var collideJobHandle = collideJob.Schedule(_latticeHeight, 1);
             var streamJobHandle = streamJob.Schedule(_latticeHeight, 1, collideJobHandle);
             var inflowJobHandle =
@@ -355,32 +390,35 @@ namespace LatticeBoltzmannMethods
             var computeEquilibriumDistributionJobHandle = computeEquilibriumDistributionJob.Schedule(_latticeHeight, 1, floodHeightsJobHandle ?? computeVelocityAndHeightJobHandle);
             var updateForcesJobHandle = updateForcesJob.Schedule(_latticeHeight, 1, computeEquilibriumDistributionJobHandle);
 
-            // Copy new distribution to the last distribution.
+            // And copy new distribution to the last distribution. This can run somewhat parallel to the simulation jobs.
             var copyNewDistributionToLastDistributionJobHandle = copyNewDistributionToLastDistributionJob.Schedule(computeVelocityAndHeightJobHandle);
             var fillNewDistributionJobHandle = fillNewDistributionJob.Schedule(copyNewDistributionToLastDistributionJobHandle);
 
-            // Wait for jobs to complete.
-            updateForcesJobHandle.Complete();
-            fillNewDistributionJobHandle.Complete();
-
-            // After jobs complete, update any textures and markers.
-            UpdateTextures(_maxHeight, MaxSpeed);
-            UpdateMarkers(); // TODO: Jobify/move to different component.
-            DumpStats(); // TODO: Jobify/move to different component.
+            // Stash the job handles.
+            _lastJobHandles = (updateForcesJobHandle, fillNewDistributionJobHandle);
         }
 
         private void OnDisable()
         {
+            if (_lastJobHandles != null)
+            {
+                _lastJobHandles.Value.Item1.Complete();
+                _lastJobHandles.Value.Item2.Complete();
+                _lastJobHandles = null;
+            }
+
             foreach (var marker in _markers)
             {
                 DestroyImmediate(marker);
             }
             _markers.Clear();
 
-            // Cleanup native arrays.
+            // Static sim data
             _linkDirection.Dispose();
             _linkOffsetX.Dispose();
             _linkOffsetY.Dispose();
+
+            // Sim data
             _solid.Dispose();
             _velocity.Dispose();
             _force.Dispose();
@@ -389,6 +427,11 @@ namespace LatticeBoltzmannMethods
             _lastDistribution.Dispose();
             _newDistribution.Dispose();
             _equilibriumDistribution.Dispose();
+
+            // Result data.
+            _solidResult.Dispose();
+            _velocityResult.Dispose();
+            _heightResult.Dispose();
         }
 
         public void AddSolidNodeCluster(float2 uv)
@@ -414,7 +457,7 @@ namespace LatticeBoltzmannMethods
 
         public void AddSolidNode(int2 colRowIdx)
         {
-            if (!_solid.IsCreated)
+            if (!_solidResult.IsCreated)
             {
                 InitializeNativeArrays();
             }
@@ -422,16 +465,7 @@ namespace LatticeBoltzmannMethods
             var clampedColRowIdx = math.clamp(colRowIdx, math.int2(0), math.int2(_latticeWidth - 1, _latticeHeight - 1));
             var nodeIdx = clampedColRowIdx.y * _latticeWidth + clampedColRowIdx.x;
 
-            _solid[nodeIdx] = true;
-
-            for (var linkIdx = 0; linkIdx < 1; linkIdx++)
-            {
-                _newDistribution[9 * nodeIdx + linkIdx] = 0.0f;
-            }
-
-            _velocity[nodeIdx] = float2.zero;
-            _height[nodeIdx] = 0.0f;
-            _force[nodeIdx] = float2.zero;
+            _solidResult[nodeIdx] = true;
         }
 
         private void UpdateTextures(float maxHeight, float maxSpeed)
@@ -475,7 +509,7 @@ namespace LatticeBoltzmannMethods
             }
 
             var maskTextureData = _maskTexture.GetPixelData<byte>(0);
-            var updateMaskTextureJob = new UpdateMaskTextureJob(_latticeWidth, _solid, maskTextureData);
+            var updateMaskTextureJob = new UpdateMaskTextureJob(_latticeWidth, _solidResult, maskTextureData);
             var jobHandle = updateMaskTextureJob.Schedule(_latticeHeight, 1);
             jobHandle.Complete();
             _maskTexture.Apply(false, false);
@@ -529,7 +563,7 @@ namespace LatticeBoltzmannMethods
             }
 
             var flowTextureData = _flowTexture.GetPixelData<byte>(0);
-            var updateFlowTexture = new UpdateFlowTextureJob(_latticeWidth, maxSpeed, _textureScale, _solid, _velocity, flowTextureData);
+            var updateFlowTexture = new UpdateFlowTextureJob(_latticeWidth, maxSpeed, _textureScale, _solidResult, _velocity, flowTextureData);
             var jobHandle = updateFlowTexture.Schedule(_latticeHeight, 1);
             jobHandle.Complete();
             _flowTexture.Apply(false, false);
