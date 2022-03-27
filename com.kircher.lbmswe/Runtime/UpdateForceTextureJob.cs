@@ -17,6 +17,7 @@ namespace LatticeBoltzmannMethods
         private NativeArray<float2> _minMaxForce;
         [ReadOnly]
         private NativeArray<float2> _force;
+
         [NativeDisableParallelForRestriction]
         private NativeArray<byte> _destination;
 

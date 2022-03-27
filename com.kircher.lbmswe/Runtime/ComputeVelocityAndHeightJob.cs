@@ -6,12 +6,10 @@ using Unity.Mathematics;
 namespace LatticeBoltzmannMethods
 {
     [BurstCompile]
-    public struct ComputeVelocityAndHeightJob : IJob
+    public struct ComputeVelocityAndHeightJob : IJobParallelFor
     {
         [ReadOnly]
         private int _latticeWidth;
-        [ReadOnly]
-        private int _latticeHeight;
         [ReadOnly]
         private float _e;
         [ReadOnly]
@@ -24,15 +22,17 @@ namespace LatticeBoltzmannMethods
         private NativeArray<bool> _solid;
 
         // Inout
+        [NativeDisableParallelForRestriction]
         private NativeArray<float> _distribution;
 
         // Out
+        [NativeDisableParallelForRestriction]
         private NativeArray<float> _height;
+        [NativeDisableParallelForRestriction]
         private NativeArray<float2> _velocity;
 
         public ComputeVelocityAndHeightJob(
             int latticeWidth,
-            int latticeHeight,
             float e,
             float maxHeight,
             float gravitationalForce,
@@ -43,7 +43,6 @@ namespace LatticeBoltzmannMethods
             NativeArray<float2> velocity)
         {
             _latticeWidth = latticeWidth;
-            _latticeHeight = latticeHeight;
             _e = e;
             _maxHeight = maxHeight;
             _gravitationalForce = gravitationalForce;
@@ -54,10 +53,12 @@ namespace LatticeBoltzmannMethods
             _velocity = velocity;
         }
 
-        public void Execute()
+        public void Execute(int rowIdx)
         {
-            for (var nodeIdx = 0; nodeIdx < _latticeWidth * _latticeHeight; nodeIdx++)
+            var rowStartIdx = rowIdx * _latticeWidth;
+            for (var colIdx = 0; colIdx < _latticeWidth; colIdx++)
             {
+                var nodeIdx = rowStartIdx + colIdx;
                 var height = 0.0f;
                 var velocity = float2.zero;
                 if (!_solid[nodeIdx])

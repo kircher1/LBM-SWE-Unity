@@ -102,8 +102,11 @@ namespace LatticeBoltzmannMethods
         private static readonly float2 Half = new float2(0.5f, 0.5f);
 
         private NativeArray<float2> _linkDirection;
+        public NativeArray<float2> LinkDirection => _linkDirection;
         private NativeArray<int> _linkOffsetX;
+        public NativeArray<int> LinkOffsetX => _linkOffsetX;
         private NativeArray<int> _linkOffsetY;
+        public NativeArray<int> LinkOffsetY => _linkOffsetY;
 
         // Simulation data.
 
@@ -243,7 +246,6 @@ namespace LatticeBoltzmannMethods
                 var computeEquilibriumDistributionJob =
                     new ComputeEquilibriumDistributionJob(
                         _latticeWidth,
-                        _latticeHeight,
                          _e,
                         GravitationalForce,
                         _linkDirection,
@@ -251,7 +253,7 @@ namespace LatticeBoltzmannMethods
                         _height,
                         _velocity,
                         _equilibriumDistribution);
-                var computeEquilibriumDistributionJobHandle = computeEquilibriumDistributionJob.Schedule();
+                var computeEquilibriumDistributionJobHandle = computeEquilibriumDistributionJob.Schedule(_latticeHeight, 1);
 
                 // Copy equilibrium distribution into the starting distribution (_lastDistribution).
                 var copyJob = new CopyJob(_equilibriumDistribution, _lastDistribution);
@@ -299,7 +301,6 @@ namespace LatticeBoltzmannMethods
             var computeVelocityAndHeightJob =
                 new ComputeVelocityAndHeightJob(
                     _latticeWidth,
-                    _latticeHeight,
                     _e,
                     _maxHeight,
                     GravitationalForce,
@@ -325,7 +326,6 @@ namespace LatticeBoltzmannMethods
             var computeEquilibriumDistributionJob =
                 new ComputeEquilibriumDistributionJob(
                     _latticeWidth,
-                    _latticeHeight,
                      _e,
                     GravitationalForce,
                     _linkDirection,
@@ -345,14 +345,14 @@ namespace LatticeBoltzmannMethods
                     // TODO: Enum to select option.
                     //new ZeroGradientInflowJob(_latticeWidth, _latticeHeight, _solid, _newDistribution).Schedule(streamJobHandle);
                     new ZhouHeInflowJob(_latticeWidth, _latticeHeight, _inverseE, _solid, _initialHeight, _initialVelocity, _newDistribution).Schedule(streamJobHandle);
-            var computeVelocityAndHeightJobHandle = computeVelocityAndHeightJob.Schedule(inflowJobHandle);
+            var computeVelocityAndHeightJobHandle = computeVelocityAndHeightJob.Schedule(_latticeHeight, 1, inflowJobHandle);
             JobHandle? floodHeightsJobHandle = null;
             if (_fixupSolidHeights)
             {
-                var floodHeightsJob = new FloodSolidHeightsJob(_latticeWidth, _latticeHeight, _solid, _height);
-                floodHeightsJobHandle = floodHeightsJob.Schedule(computeVelocityAndHeightJobHandle);
+                var floodHeightsJob = new FloodSolidHeightsJob(_latticeWidth, _solid, _height);
+                floodHeightsJobHandle = floodHeightsJob.Schedule(_latticeHeight - 1, 1, computeVelocityAndHeightJobHandle);
             }
-            var computeEquilibriumDistributionJobHandle = computeEquilibriumDistributionJob.Schedule(floodHeightsJobHandle ?? computeVelocityAndHeightJobHandle);
+            var computeEquilibriumDistributionJobHandle = computeEquilibriumDistributionJob.Schedule(_latticeHeight, 1, floodHeightsJobHandle ?? computeVelocityAndHeightJobHandle);
             var updateForcesJobHandle = updateForcesJob.Schedule(_latticeHeight, 1, computeEquilibriumDistributionJobHandle);
 
             // Copy new distribution to the last distribution.

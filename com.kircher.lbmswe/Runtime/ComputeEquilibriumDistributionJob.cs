@@ -5,14 +5,11 @@ using Unity.Mathematics;
 
 namespace LatticeBoltzmannMethods
 {
-    // TODO: ParallelJob-ify
     [BurstCompile]
-    public struct ComputeEquilibriumDistributionJob : IJob
+    public struct ComputeEquilibriumDistributionJob : IJobParallelFor
     {
         [ReadOnly]
         private int _latticeWidth;
-        [ReadOnly]
-        private int _latticeHeight;
         [ReadOnly]
         private float _e;
         [ReadOnly]
@@ -26,11 +23,11 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private NativeArray<float2> _velocity;
 
+        [NativeDisableParallelForRestriction]
         private NativeArray<float> _equilibriumDistribution; // output
 
         public ComputeEquilibriumDistributionJob(
             int latticeWidth,
-            int latticeHeight,
             float e,
             float gravitationalForce,
             NativeArray<float2> linkDirection,
@@ -40,7 +37,6 @@ namespace LatticeBoltzmannMethods
             NativeArray<float> equilibriumDistribution)
         {
             _latticeWidth = latticeWidth;
-            _latticeHeight = latticeHeight;
             _e = e;
             _gravitationalForce = gravitationalForce;
             _linkDirection = linkDirection;
@@ -50,13 +46,14 @@ namespace LatticeBoltzmannMethods
             _equilibriumDistribution = equilibriumDistribution;
         }
 
-        public void Execute()
+        public void Execute(int rowIdx)
         {
             var inverseESq = 1.0f / (_e * _e);
             var inverseEQd = inverseESq * inverseESq;
-
-            for (var nodeIdx = 0; nodeIdx < _latticeWidth * _latticeHeight; nodeIdx++)
+            var rowStartIdx = rowIdx * _latticeWidth;
+            for (var colIdx = 0; colIdx < _latticeWidth; colIdx++)
             {
+                var nodeIdx = rowStartIdx + colIdx;
                 if (_solid[nodeIdx])
                 {
                     continue;
