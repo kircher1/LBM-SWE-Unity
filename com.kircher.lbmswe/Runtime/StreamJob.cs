@@ -87,7 +87,7 @@ namespace LatticeBoltzmannMethods
                     _distribution[9 * nodeIdx + 6] = _distribution[9 * (nodeIdx - 1) + 6];
 
                     // TODO: This does not work as expected.
-                    // Start 2: Zou and He.
+                    // Strat 2: Zou and He.
                     //var waterHeight = _height[nodeIdx];
                     //var u = _velocity[nodeIdx].x;
                     //_newDistribution[9 * nodeIdx + 5] = _newDistribution[9 * nodeIdx + 1] - (2.0f / 3.0f) * inverseE * waterHeight * u;
