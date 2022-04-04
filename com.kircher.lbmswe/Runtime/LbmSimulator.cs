@@ -10,17 +10,19 @@ namespace LatticeBoltzmannMethods
     // TODO: Optimization ideas
     // - Split link data into separate arrays. Then run equilibrium distribution jobs in parallel.
 
+    /// <summary>
+    /// Simulates shallow water flows on a 2D lattice. Origin node is at the "bottom-left" corner of lattice.
+    /// </summary>
     [ExecuteInEditMode]
     public class LbmSimulator : MonoBehaviour
     {
         private const float GravitationalForce = 9.8f;
-        private const float Sqrt2 = 1.41421356237f;
         private const float PiOverFour = 0.78539816339f;
 
         private static readonly ValueTuple<JobHandle?, Texture2D, TextureEventHandler> NoTextureProcessedResult = (null, null, null);
 
         [SerializeField]
-        [Range(0.016f, 1.0f)]
+        [Range(0.001f, 1.0f)]
         private float _simulationStepTime = 0.016f;
 
         [SerializeField]
@@ -160,7 +162,7 @@ namespace LatticeBoltzmannMethods
                 linkDirection[linkIdx] = math.normalize(new float2(math.cos(angle), math.sin(angle)));
                 if (linkIdx % 2 == 0)
                 {
-                    linkDirection[linkIdx] *= Sqrt2;
+                    linkDirection[linkIdx] *= math.SQRT2;
                 }
 
                 linkOffsetX[linkIdx] = _linkOffsetX[linkIdx];
@@ -241,7 +243,7 @@ namespace LatticeBoltzmannMethods
             }
 
             // Set initial velocity, some factor of the max speed.
-            _initialVelocity = new float2((_startingHeight / _maxHeight) * MaxSpeed / Sqrt2, 0.0f);
+            _initialVelocity = new float2((_startingHeight / _maxHeight) * MaxSpeed / math.SQRT2, 0.0f);
             startupLog += $"Initial velocity: {_initialVelocity}\r\n";
             for (var nodeIdx = 0; nodeIdx < _velocity.Length; nodeIdx++)
             {
@@ -374,24 +376,34 @@ namespace LatticeBoltzmannMethods
             // Schedule simulation jobs.
             var collideJobHandle = collideJob.Schedule(_latticeHeight, 1);
             var streamJobHandle = streamJob.Schedule(_latticeHeight, 1, collideJobHandle);
+            var computeVelocityAndHeightJobHandle = computeVelocityAndHeightJob.Schedule(_latticeHeight, 1, streamJobHandle);
             var inflowJobHandle =
                 _usePeriodicBoundary ?
-                    streamJobHandle :
+                    computeVelocityAndHeightJobHandle :
                     // TODO: Enum to select option.
-                    //new ZeroGradientInflowJob(_latticeWidth, _latticeHeight, _solid, _newDistribution).Schedule(streamJobHandle);
-                    new ZhouHeInflowJob(_latticeWidth, _latticeHeight, _inverseE, _solid, _initialHeight, _initialVelocity, _newDistribution).Schedule(streamJobHandle);
-            var computeVelocityAndHeightJobHandle = computeVelocityAndHeightJob.Schedule(_latticeHeight, 1, inflowJobHandle);
-            JobHandle? floodHeightsJobHandle = null;
+                    //new ZeroGradientInflowJob(_latticeWidth, _latticeHeight, _solid, _newDistribution).Schedule(computeVelocityAndHeightJobHandle);
+                    new ZhouHeInflowJob(
+                        _latticeWidth,
+                        _latticeHeight,
+                        _inverseE,
+                        _solid,
+                        _initialHeight,
+                        _initialVelocity,
+                        _newDistribution,
+                        _height,
+                        _velocity).
+                    Schedule(computeVelocityAndHeightJobHandle);
+            JobHandle floodHeightsJobHandle = inflowJobHandle;
             if (_fixupSolidHeights)
             {
                 var floodHeightsJob = new FloodSolidHeightsJob(_latticeWidth, _solid, _height);
-                floodHeightsJobHandle = floodHeightsJob.Schedule(_latticeHeight - 1, 1, computeVelocityAndHeightJobHandle);
+                floodHeightsJobHandle = floodHeightsJob.Schedule(_latticeHeight - 1, 1, inflowJobHandle);
             }
-            var computeEquilibriumDistributionJobHandle = computeEquilibriumDistributionJob.Schedule(_latticeHeight, 1, floodHeightsJobHandle ?? computeVelocityAndHeightJobHandle);
+            var computeEquilibriumDistributionJobHandle = computeEquilibriumDistributionJob.Schedule(_latticeHeight, 1, floodHeightsJobHandle);
             var updateForcesJobHandle = updateForcesJob.Schedule(_latticeHeight, 1, computeEquilibriumDistributionJobHandle);
 
             // And copy new distribution to the last distribution. This can run somewhat parallel to the simulation jobs.
-            var copyNewDistributionToLastDistributionJobHandle = copyNewDistributionToLastDistributionJob.Schedule(computeVelocityAndHeightJobHandle);
+            var copyNewDistributionToLastDistributionJobHandle = copyNewDistributionToLastDistributionJob.Schedule(inflowJobHandle);
             var fillNewDistributionJobHandle = fillNewDistributionJob.Schedule(copyNewDistributionToLastDistributionJobHandle);
 
             // Stash the job handles.

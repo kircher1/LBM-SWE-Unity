@@ -689,7 +689,7 @@ MonoBehaviour:
   _applyShearForces: 1
   _smagorinskyConstant: 0.18
   _textureScale: 0.618
-  _usePeriodicBoundary: 1
+  _usePeriodicBoundary: 0
   _fixupSolidHeights: 1
   _showMarkers: 1
   _markerPrefab: {fileID: 0}

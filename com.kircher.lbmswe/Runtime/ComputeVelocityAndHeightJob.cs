@@ -55,8 +55,9 @@ namespace LatticeBoltzmannMethods
 
         public void Execute(int rowIdx)
         {
+            // Note, inflow job is responsible for updating height/velocity for inlet nodes.
             var rowStartIdx = rowIdx * _latticeWidth;
-            for (var colIdx = 0; colIdx < _latticeWidth; colIdx++)
+            for (var colIdx = 1; colIdx < _latticeWidth; colIdx++)
             {
                 var nodeIdx = rowStartIdx + colIdx;
                 var height = 0.0f;
@@ -67,7 +68,7 @@ namespace LatticeBoltzmannMethods
                     {
                         var linkDistribution = _distribution[9 * nodeIdx + linkIdx];
                         height += linkDistribution;
-                        velocity += _e * linkDistribution * _linkDirection[linkIdx];
+                        velocity += linkDistribution * _linkDirection[linkIdx];
                     }
                 }
 
@@ -89,7 +90,7 @@ namespace LatticeBoltzmannMethods
                         }
                     }
 
-                    velocity /= height;
+                    velocity *= _e / height;
 
                     const float FroudeNumberLimit = 0.75f;
                     var froudeNumber = math.length(velocity) / math.sqrt(_gravitationalForce * height);

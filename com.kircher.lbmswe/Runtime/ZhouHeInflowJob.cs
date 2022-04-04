@@ -7,7 +7,9 @@ using Unity.Mathematics;
 namespace LatticeBoltzmannMethods
 {
     /// <summary>
-    /// Computes missing inlet link distributions by applying method by Zhou and He.
+    /// Computes missing inlet link distributions by applying method by Zhou and He,
+    /// and updates height and  velocity on inlet nodes.
+    /// TODO: Handle corners.
     /// </summary>
     [BurstCompile]
     public struct ZhouHeInflowJob : IJob
@@ -25,7 +27,9 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private float2 _inletVelocity;
 
-        private NativeArray<float> _newDistribution;
+        private NativeArray<float> _distribution;
+        private NativeArray<float> _height;
+        private NativeArray<float2> _velocity;
 
         public ZhouHeInflowJob(
             int latticeWidth,
@@ -34,7 +38,9 @@ namespace LatticeBoltzmannMethods
             NativeArray<bool> solid,
             float inletWaterHeight,
             float2 inletVelocity,
-            NativeArray<float> newDistribution)
+            NativeArray<float> distribution,
+            NativeArray<float> height,
+            NativeArray<float2> velocity)
         {
             if (inletVelocity.y != 0)
             {
@@ -47,7 +53,9 @@ namespace LatticeBoltzmannMethods
             _solid = solid;
             _inletWaterHeight = inletWaterHeight;
             _inletVelocity = inletVelocity;
-            _newDistribution = newDistribution;
+            _distribution = distribution;
+            _height = height;
+            _velocity = velocity;
         }
 
         public void Execute()
@@ -58,9 +66,12 @@ namespace LatticeBoltzmannMethods
                 var nodeIdx = rowIdx * _latticeWidth;
                 if (!_solid[nodeIdx])
                 {
-                    _newDistribution[9 * nodeIdx + 1] = _newDistribution[9 * nodeIdx + 5] + (2.0f / 3.0f) * _inverseE * _inletWaterHeight * u;
-                    _newDistribution[9 * nodeIdx + 2] = (1.0f / 6.0f) * _inverseE * _inletWaterHeight * u + _newDistribution[9 * nodeIdx + 6] + 0.5f * (_newDistribution[9 * nodeIdx + 7] - _newDistribution[9 * nodeIdx + 3]);
-                    _newDistribution[9 * nodeIdx + 8] = (1.0f / 6.0f) * _inverseE * _inletWaterHeight * u + _newDistribution[9 * nodeIdx + 4] + 0.5f * (_newDistribution[9 * nodeIdx + 3] - _newDistribution[9 * nodeIdx + 7]);
+                    _distribution[9 * nodeIdx + 1] = _distribution[9 * nodeIdx + 5] + (2.0f / 3.0f) * _inverseE * _inletWaterHeight * u;
+                    _distribution[9 * nodeIdx + 2] = (1.0f / 6.0f) * _inverseE * _inletWaterHeight * u + _distribution[9 * nodeIdx + 6] + 0.5f * (_distribution[9 * nodeIdx + 7] - _distribution[9 * nodeIdx + 3]);
+                    _distribution[9 * nodeIdx + 8] = (1.0f / 6.0f) * _inverseE * _inletWaterHeight * u + _distribution[9 * nodeIdx + 4] + 0.5f * (_distribution[9 * nodeIdx + 3] - _distribution[9 * nodeIdx + 7]);
+
+                    _velocity[nodeIdx] = _inletVelocity;
+                    _height[nodeIdx] = _inletWaterHeight;
                 }
             }
         }
