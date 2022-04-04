@@ -9,7 +9,6 @@ namespace LatticeBoltzmannMethods
     /// <summary>
     /// Computes missing inlet link distributions by applying method by Zhou and He,
     /// and updates height and  velocity on inlet nodes.
-    /// TODO: Handle corners.
     /// </summary>
     [BurstCompile]
     public struct ZhouHeInflowJob : IJob
@@ -71,22 +70,48 @@ namespace LatticeBoltzmannMethods
                     continue;
                 }
 
-                _distribution[9 * nodeIdx + 1] = _distribution[9 * nodeIdx + 5] + (2.0f / 3.0f) * _inverseE * _inletWaterHeight * u;
-                _distribution[9 * nodeIdx + 2] = (1.0f / 6.0f) * _inverseE * _inletWaterHeight * u + _distribution[9 * nodeIdx + 6] + 0.5f * (_distribution[9 * nodeIdx + 7] - _distribution[9 * nodeIdx + 3]);
-                _distribution[9 * nodeIdx + 8] = (1.0f / 6.0f) * _inverseE * _inletWaterHeight * u + _distribution[9 * nodeIdx + 4] + 0.5f * (_distribution[9 * nodeIdx + 3] - _distribution[9 * nodeIdx + 7]);
-
-                if (rowIdx == 0) // Bottom-left corner.
+                if (rowIdx == 0) // Bottom-left corner. (only works if diagonally adjacent flow node is not solid.)
                 {
+                    var neighborHeight = _height[nodeIdx + 1 + _latticeWidth];
+                    _distribution[9 * nodeIdx + 1] = _distribution[9 * nodeIdx + 5];
+                    _distribution[9 * nodeIdx + 2] = _distribution[9 * nodeIdx + 6];
                     _distribution[9 * nodeIdx + 3] = _distribution[9 * nodeIdx + 7];
-                    _distribution[9 * nodeIdx + 4] = _distribution[9 * nodeIdx + 8];
+                    var distributionSumFor4and8 =
+                        _distribution[9 * nodeIdx + 0] +
+                        _distribution[9 * nodeIdx + 1] +
+                        _distribution[9 * nodeIdx + 2] +
+                        _distribution[9 * nodeIdx + 3] +
+                        _distribution[9 * nodeIdx + 5] +
+                        _distribution[9 * nodeIdx + 6] +
+                        _distribution[9 * nodeIdx + 7];
+                    _distribution[9 * nodeIdx + 4] = _distribution[9 * nodeIdx + 8] = 0.5f * (neighborHeight - distributionSumFor4and8);
+                    _velocity[nodeIdx] = float2.zero;
                 }
-                else if (rowIdx == _latticeHeight - 1) // Top-left corner.
+                else if (rowIdx == _latticeHeight - 1) // Top-left corner. (only works if diagonally adjacent flow node is not solid.)
                 {
-                    _distribution[9 * nodeIdx + 6] = _distribution[9 * nodeIdx + 2];
+                    var neighborHeight = _height[nodeIdx + 1 - _latticeWidth];
+                    _distribution[9 * nodeIdx + 1] = _distribution[9 * nodeIdx + 5];
                     _distribution[9 * nodeIdx + 7] = _distribution[9 * nodeIdx + 3];
+                    _distribution[9 * nodeIdx + 8] = _distribution[9 * nodeIdx + 4];
+                    var distributionSumFor2and6 =
+                        _distribution[9 * nodeIdx + 0] +
+                        _distribution[9 * nodeIdx + 1] +
+                        _distribution[9 * nodeIdx + 3] +
+                        _distribution[9 * nodeIdx + 4] +
+                        _distribution[9 * nodeIdx + 5] +
+                        _distribution[9 * nodeIdx + 7] +
+                        _distribution[9 * nodeIdx + 8];
+                    _distribution[9 * nodeIdx + 2] = _distribution[9 * nodeIdx + 6] = 0.5f * (neighborHeight - distributionSumFor2and6);
+                    _velocity[nodeIdx] = float2.zero;
+                }
+                else // General case, not a corner.
+                {
+                    _distribution[9 * nodeIdx + 1] = _distribution[9 * nodeIdx + 5] + (2.0f / 3.0f) * _inverseE * _inletWaterHeight * u;
+                    _distribution[9 * nodeIdx + 2] = (1.0f / 6.0f) * _inverseE * _inletWaterHeight * u + _distribution[9 * nodeIdx + 6] + 0.5f * (_distribution[9 * nodeIdx + 7] - _distribution[9 * nodeIdx + 3]);
+                    _distribution[9 * nodeIdx + 8] = (1.0f / 6.0f) * _inverseE * _inletWaterHeight * u + _distribution[9 * nodeIdx + 4] + 0.5f * (_distribution[9 * nodeIdx + 3] - _distribution[9 * nodeIdx + 7]);
+                    _velocity[nodeIdx] = _inletVelocity;
                 }
 
-                _velocity[nodeIdx] = _inletVelocity;
                 _height[nodeIdx] = _inletWaterHeight;
             }
         }
