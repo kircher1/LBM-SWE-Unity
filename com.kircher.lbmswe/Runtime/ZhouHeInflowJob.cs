@@ -64,15 +64,30 @@ namespace LatticeBoltzmannMethods
             for (var rowIdx = 0; rowIdx < _latticeHeight; rowIdx++)
             {
                 var nodeIdx = rowIdx * _latticeWidth;
-                if (!_solid[nodeIdx])
-                {
-                    _distribution[9 * nodeIdx + 1] = _distribution[9 * nodeIdx + 5] + (2.0f / 3.0f) * _inverseE * _inletWaterHeight * u;
-                    _distribution[9 * nodeIdx + 2] = (1.0f / 6.0f) * _inverseE * _inletWaterHeight * u + _distribution[9 * nodeIdx + 6] + 0.5f * (_distribution[9 * nodeIdx + 7] - _distribution[9 * nodeIdx + 3]);
-                    _distribution[9 * nodeIdx + 8] = (1.0f / 6.0f) * _inverseE * _inletWaterHeight * u + _distribution[9 * nodeIdx + 4] + 0.5f * (_distribution[9 * nodeIdx + 3] - _distribution[9 * nodeIdx + 7]);
 
-                    _velocity[nodeIdx] = _inletVelocity;
-                    _height[nodeIdx] = _inletWaterHeight;
+                // Really, this assumes no solid nodes on inlet column, but skip if encountered node is solid.
+                if (_solid[nodeIdx])
+                {
+                    continue;
                 }
+
+                _distribution[9 * nodeIdx + 1] = _distribution[9 * nodeIdx + 5] + (2.0f / 3.0f) * _inverseE * _inletWaterHeight * u;
+                _distribution[9 * nodeIdx + 2] = (1.0f / 6.0f) * _inverseE * _inletWaterHeight * u + _distribution[9 * nodeIdx + 6] + 0.5f * (_distribution[9 * nodeIdx + 7] - _distribution[9 * nodeIdx + 3]);
+                _distribution[9 * nodeIdx + 8] = (1.0f / 6.0f) * _inverseE * _inletWaterHeight * u + _distribution[9 * nodeIdx + 4] + 0.5f * (_distribution[9 * nodeIdx + 3] - _distribution[9 * nodeIdx + 7]);
+
+                if (rowIdx == 0) // Bottom-left corner.
+                {
+                    _distribution[9 * nodeIdx + 3] = _distribution[9 * nodeIdx + 7];
+                    _distribution[9 * nodeIdx + 4] = _distribution[9 * nodeIdx + 8];
+                }
+                else if (rowIdx == _latticeHeight - 1) // Top-left corner.
+                {
+                    _distribution[9 * nodeIdx + 6] = _distribution[9 * nodeIdx + 2];
+                    _distribution[9 * nodeIdx + 7] = _distribution[9 * nodeIdx + 3];
+                }
+
+                _velocity[nodeIdx] = _inletVelocity;
+                _height[nodeIdx] = _inletWaterHeight;
             }
         }
     }

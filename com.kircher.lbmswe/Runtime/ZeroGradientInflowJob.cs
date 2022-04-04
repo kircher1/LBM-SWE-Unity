@@ -6,6 +6,7 @@ namespace LatticeBoltzmannMethods
 {
     /// <summary>
     /// Computes missing inlet link distributions by copying from neighboring column.
+    /// TODO: Handle corners.
     /// </summary>
     [BurstCompile]
     public struct ZeroGradientInflowJob : IJob
