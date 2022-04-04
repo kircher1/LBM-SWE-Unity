@@ -381,8 +381,17 @@ namespace LatticeBoltzmannMethods
                 _usePeriodicBoundary ?
                     computeVelocityAndHeightJobHandle :
                     // TODO: Enum to select option.
-                    //new ZeroGradientInflowJob(_latticeWidth, _latticeHeight, _solid, _newDistribution).Schedule(computeVelocityAndHeightJobHandle);
-                    new ZhouHeInflowJob(
+                    //new ZeroGradientInflowJob(
+                    //    _latticeWidth,
+                    //    _latticeHeight,
+                    //    _solid,
+                    //    _initialHeight,
+                    //    _initialVelocity,
+                    //    _newDistribution,
+                    //    _height,
+                    //    _velocity).
+                    //Schedule(computeVelocityAndHeightJobHandle);
+                    new ZouHeInflowJob(
                         _latticeWidth,
                         _latticeHeight,
                         _inverseE,
@@ -393,17 +402,29 @@ namespace LatticeBoltzmannMethods
                         _height,
                         _velocity).
                     Schedule(computeVelocityAndHeightJobHandle);
-            JobHandle floodHeightsJobHandle = inflowJobHandle;
-            if (_fixupSolidHeights)
-            {
-                var floodHeightsJob = new FloodSolidHeightsJob(_latticeWidth, _solid, _height);
-                floodHeightsJobHandle = floodHeightsJob.Schedule(_latticeHeight - 1, 1, inflowJobHandle);
-            }
+            var outflowJobHandle =
+                _usePeriodicBoundary ?
+                    inflowJobHandle :
+                    // TODO: Enum to select option.
+                    //new ZeroGradientOutflowJob(_latticeWidth, _latticeHeight, _solid, _newDistribution).Schedule(inflowJobHandle);
+                    new ZouHeOutflowJob(
+                        _latticeWidth,
+                        _latticeHeight,
+                        _inverseE,
+                        _solid,
+                        _newDistribution,
+                        _height,
+                        _velocity).
+                    Schedule(inflowJobHandle);
+            var floodHeightsJobHandle =
+                _fixupSolidHeights ?
+                    outflowJobHandle :
+                    new FloodSolidHeightsJob(_latticeWidth, _solid, _height).Schedule(_latticeHeight - 1, 1, outflowJobHandle);
             var computeEquilibriumDistributionJobHandle = computeEquilibriumDistributionJob.Schedule(_latticeHeight, 1, floodHeightsJobHandle);
             var updateForcesJobHandle = updateForcesJob.Schedule(_latticeHeight, 1, computeEquilibriumDistributionJobHandle);
 
             // And copy new distribution to the last distribution. This can run somewhat parallel to the simulation jobs.
-            var copyNewDistributionToLastDistributionJobHandle = copyNewDistributionToLastDistributionJob.Schedule(inflowJobHandle);
+            var copyNewDistributionToLastDistributionJobHandle = copyNewDistributionToLastDistributionJob.Schedule(outflowJobHandle);
             var fillNewDistributionJobHandle = fillNewDistributionJob.Schedule(copyNewDistributionToLastDistributionJobHandle);
 
             // Stash the job handles.

@@ -72,29 +72,6 @@ namespace LatticeBoltzmannMethods
                     }
                 }
             }
-
-            // Handle missing distributions at outlet.
-            // TODO: Separate job.
-            if (!_usePeriodicBoundary)
-            {
-                // var inverseE = 1.0f / e;
-                var nodeIdx = rowIdx * _latticeWidth + _latticeWidth - 1;
-                if (!_solid[nodeIdx])
-                {
-                    // Strat 1: Copy from neighbor.
-                    _distribution[9 * nodeIdx + 4] = _distribution[9 * (nodeIdx - 1) + 4];
-                    _distribution[9 * nodeIdx + 5] = _distribution[9 * (nodeIdx - 1) + 5];
-                    _distribution[9 * nodeIdx + 6] = _distribution[9 * (nodeIdx - 1) + 6];
-
-                    // TODO: This does not work as expected.
-                    // Strat 2: Zou and He.
-                    //var waterHeight = _height[nodeIdx];
-                    //var u = _velocity[nodeIdx].x;
-                    //_newDistribution[9 * nodeIdx + 5] = _newDistribution[9 * nodeIdx + 1] - (2.0f / 3.0f) * inverseE * waterHeight * u;
-                    //_newDistribution[9 * nodeIdx + 4] = -(1.0f / 6.0f) * inverseE * waterHeight * u + _newDistribution[9 * nodeIdx + 8] + 0.5f * (_newDistribution[9 * nodeIdx + 7] - _newDistribution[9 * nodeIdx + 3]);
-                    //_newDistribution[9 * nodeIdx + 6] = -(1.0f / 6.0f) * inverseE * waterHeight * u + _newDistribution[9 * nodeIdx + 2] + 0.5f * (_newDistribution[9 * nodeIdx + 3] - _newDistribution[9 * nodeIdx + 7]);
-                }
-            }
         }
     }
 }

@@ -55,9 +55,9 @@ namespace LatticeBoltzmannMethods
 
         public void Execute(int rowIdx)
         {
-            // Note, inflow job is responsible for updating height/velocity for inlet nodes.
+            // Note, inflow and outflow jobs are responsible for updating height/velocity for inlet/outlet nodes.
             var rowStartIdx = rowIdx * _latticeWidth;
-            for (var colIdx = 1; colIdx < _latticeWidth; colIdx++)
+            for (var colIdx = 1; colIdx < _latticeWidth - 1; colIdx++)
             {
                 var nodeIdx = rowStartIdx + colIdx;
                 var height = 0.0f;

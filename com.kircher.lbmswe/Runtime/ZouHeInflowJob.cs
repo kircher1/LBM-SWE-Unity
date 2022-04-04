@@ -7,11 +7,11 @@ using Unity.Mathematics;
 namespace LatticeBoltzmannMethods
 {
     /// <summary>
-    /// Computes missing inlet link distributions by applying method by Zhou and He,
+    /// Computes missing inlet link distributions by applying method by Zou and He
     /// and updates height and  velocity on inlet nodes.
     /// </summary>
     [BurstCompile]
-    public struct ZhouHeInflowJob : IJob
+    public struct ZouHeInflowJob : IJob
     {
         [ReadOnly]
         private int _latticeWidth;
@@ -30,7 +30,7 @@ namespace LatticeBoltzmannMethods
         private NativeArray<float> _height;
         private NativeArray<float2> _velocity;
 
-        public ZhouHeInflowJob(
+        public ZouHeInflowJob(
             int latticeWidth,
             int latticeHeight,
             float inverseE,
