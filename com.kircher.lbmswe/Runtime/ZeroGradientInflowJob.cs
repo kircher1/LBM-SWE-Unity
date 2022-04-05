@@ -65,8 +65,6 @@ namespace LatticeBoltzmannMethods
                     _distribution[9 * nodeIdx + 8] = _distribution[9 * neighborNodeIdx + 8];
                     _distribution[9 * nodeIdx + 3] = _distribution[9 * neighborNodeIdx + 3];
                     _distribution[9 * nodeIdx + 4] = _distribution[9 * neighborNodeIdx + 4];
-                    _velocity[nodeIdx] = float2.zero;
-                    _height[nodeIdx] = _height[neighborNodeIdx];
                 }
                 else if (rowIdx == _latticeHeight - 1) // top-left corner
                 {
@@ -77,8 +75,6 @@ namespace LatticeBoltzmannMethods
                     _distribution[9 * nodeIdx + 8] = _distribution[9 * neighborNodeIdx + 8];
                     _distribution[9 * nodeIdx + 6] = _distribution[9 * neighborNodeIdx + 6];
                     _distribution[9 * nodeIdx + 7] = _distribution[9 * neighborNodeIdx + 7];
-                    _velocity[nodeIdx] = float2.zero;
-                    _height[nodeIdx] = _height[neighborNodeIdx];
                 }
                 else
                 {

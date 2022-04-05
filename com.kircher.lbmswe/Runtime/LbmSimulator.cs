@@ -63,7 +63,7 @@ namespace LatticeBoltzmannMethods
         private float _textureScale = 1.0f;
 
         [SerializeField]
-        private bool _usePeriodicBoundary = false;
+        private InletOutletBoundaryCondition _inletOutletBoundaryCondition = InletOutletBoundaryCondition.ZouHe;
 
         /// <summary>
         /// Flood fills solid nodes with the average of non-solid neighboring heights.
@@ -153,8 +153,8 @@ namespace LatticeBoltzmannMethods
             linkOffsetX = new NativeArray<int>(9, Allocator.Persistent);
             linkOffsetY = new NativeArray<int>(9, Allocator.Persistent);
 
-            var _linkOffsetX = new[] { 0, 1, 1, 0, -1, -1, -1, 0, 1 };
-            var _linkOffsetY = new[] { 0, 0, 1, 1, 1, 0, -1, -1, -1 };
+            var _linkOffsetX = new[] { 0,  1,  1,  0, -1, -1, -1,  0,  1 };
+            var _linkOffsetY = new[] { 0,  0,  1,  1,  1,  0, -1, -1, -1 };
 
             for (var linkIdx = 1; linkIdx < 9; linkIdx++)
             {
@@ -309,6 +309,7 @@ namespace LatticeBoltzmannMethods
             var relaxationTimeSq = _relaxationTime * _relaxationTime;
 
             // Setup jobs.
+            var usePeriodicBoundary = _inletOutletBoundaryCondition == InletOutletBoundaryCondition.Periodic;
             var collideJob =
                 new CollideJob(
                     _simulationStepTime,
@@ -327,7 +328,7 @@ namespace LatticeBoltzmannMethods
                     _lastDistribution);
             var streamJob =
                 new StreamJob(
-                    _usePeriodicBoundary,
+                    usePeriodicBoundary,
                     _latticeWidth,
                     _latticeHeight,
                     _linkOffsetX,
@@ -378,46 +379,46 @@ namespace LatticeBoltzmannMethods
             var streamJobHandle = streamJob.Schedule(_latticeHeight, 1, collideJobHandle);
             var computeVelocityAndHeightJobHandle = computeVelocityAndHeightJob.Schedule(_latticeHeight, 1, streamJobHandle);
             var inflowJobHandle =
-                _usePeriodicBoundary ?
+                usePeriodicBoundary ?
                     computeVelocityAndHeightJobHandle :
-                    // TODO: Enum to select option.
-                    //new ZeroGradientInflowJob(
-                    //    _latticeWidth,
-                    //    _latticeHeight,
-                    //    _solid,
-                    //    _initialHeight,
-                    //    _initialVelocity,
-                    //    _newDistribution,
-                    //    _height,
-                    //    _velocity).
-                    //Schedule(computeVelocityAndHeightJobHandle);
-                    new ZouHeInflowJob(
-                        _latticeWidth,
-                        _latticeHeight,
-                        _inverseE,
-                        _solid,
-                        _initialHeight,
-                        _initialVelocity,
-                        _newDistribution,
-                        _height,
-                        _velocity).
-                    Schedule(computeVelocityAndHeightJobHandle);
+                    _inletOutletBoundaryCondition == InletOutletBoundaryCondition.ZeroGradient ?
+                        new ZeroGradientInflowJob(
+                            _latticeWidth,
+                            _latticeHeight,
+                            _solid,
+                            _initialHeight,
+                            _initialVelocity,
+                            _newDistribution,
+                            _height,
+                            _velocity).
+                        Schedule(computeVelocityAndHeightJobHandle) :
+                new ZouHeInflowJob(
+                            _latticeWidth,
+                            _latticeHeight,
+                            _inverseE,
+                            _solid,
+                            _initialHeight,
+                            _initialVelocity,
+                            _newDistribution,
+                            _height,
+                            _velocity).
+                        Schedule(computeVelocityAndHeightJobHandle);
             var outflowJobHandle =
-                _usePeriodicBoundary ?
+                usePeriodicBoundary ?
                     inflowJobHandle :
-                    // TODO: Enum to select option.
-                    //new ZeroGradientOutflowJob(_latticeWidth, _latticeHeight, _solid, _newDistribution).Schedule(inflowJobHandle);
-                    new ZouHeOutflowJob(
-                        _latticeWidth,
-                        _latticeHeight,
-                        _inverseE,
-                        _solid,
-                        _newDistribution,
-                        _height,
-                        _velocity).
-                    Schedule(inflowJobHandle);
+                    _inletOutletBoundaryCondition == InletOutletBoundaryCondition.ZeroGradient ?
+                        new ZeroGradientOutflowJob(_latticeWidth, _latticeHeight, _solid, _newDistribution, _height, _velocity).Schedule(inflowJobHandle) :
+                        new ZouHeOutflowJob(
+                            _latticeWidth,
+                            _latticeHeight,
+                            _inverseE,
+                            _solid,
+                            _newDistribution,
+                            _height,
+                            _velocity).
+                        Schedule(inflowJobHandle);
             var floodHeightsJobHandle =
-                _fixupSolidHeights ?
+                !_fixupSolidHeights ?
                     outflowJobHandle :
                     new FloodSolidHeightsJob(_latticeWidth, _solid, _height).Schedule(_latticeHeight - 1, 1, outflowJobHandle);
             var computeEquilibriumDistributionJobHandle = computeEquilibriumDistributionJob.Schedule(_latticeHeight, 1, floodHeightsJobHandle);
@@ -487,7 +488,7 @@ namespace LatticeBoltzmannMethods
             var colRowIdx = math.int2(math.round(math.saturate(uv) * new float2(_latticeWidth - 1, _latticeHeight - 1)));
             AddSolidNode(colRowIdx);
         }
-
+          
         public void AddSolidNode(int2 colRowIdx)
         {
             if (!_solidResult.IsCreated)
