@@ -113,13 +113,13 @@ namespace LatticeBoltzmannMethods
                         inverseRelaxationTime = 1.0f / totalRelaxationTime;
                     }
 
-                    var force = _force[nodeIdx];
+                    var force = (1.0f / 6.0f) * _e * _inverseESq * _deltaT * _force[nodeIdx];
                     for (var linkIdx = 0; linkIdx < 9; linkIdx++)
                     {
                         var equilibriumDistribution = _equilibriumDistribution[9 * nodeIdx + linkIdx];
                         var currentDistribution = _distribution[9 * nodeIdx + linkIdx];
                         var relaxationTerm = inverseRelaxationTime * (currentDistribution - equilibriumDistribution);
-                        var forceTerm = linkIdx == 0 ? 0.0f : (1.0f / 6.0f) * _inverseESq * _deltaT * math.dot(force, _e * _linkDirection[linkIdx]);
+                        var forceTerm = linkIdx == 0 ? 0.0f : math.dot(force, _linkDirection[linkIdx]);
                         _distribution[9 * nodeIdx + linkIdx] = currentDistribution - relaxationTerm + forceTerm;
                     }
                 }

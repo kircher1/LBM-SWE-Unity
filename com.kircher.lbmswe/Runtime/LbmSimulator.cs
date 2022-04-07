@@ -333,7 +333,6 @@ namespace LatticeBoltzmannMethods
                     _latticeHeight,
                     _linkOffsetX,
                     _linkOffsetY,
-                    _solid,
                     _lastDistribution,
                     _newDistribution);
             var computeVelocityAndHeightJob =

@@ -18,8 +18,6 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private NativeArray<int> _linkOffsetY;
         [ReadOnly]
-        private NativeArray<bool> _solid;
-        [ReadOnly]
         private NativeArray<float> _lastDistribution;
 
         [NativeDisableParallelForRestriction]
@@ -31,7 +29,6 @@ namespace LatticeBoltzmannMethods
             int latticeHeight,
             NativeArray<int> linkOffsetX,
             NativeArray<int> linkOffsetY,
-            NativeArray<bool> solid,
             NativeArray<float> lastDistribution,
             NativeArray<float> distribution)
         {
@@ -40,7 +37,6 @@ namespace LatticeBoltzmannMethods
             _latticeHeight = latticeHeight;
             _linkOffsetX = linkOffsetX;
             _linkOffsetY = linkOffsetY;
-            _solid = solid;
             _lastDistribution = lastDistribution;
             _distribution = distribution;
         }
