@@ -97,7 +97,6 @@ namespace LatticeBoltzmannMethods
         public event TextureEventHandler FlowTextureUpdated;
         public event TextureEventHandler HeightTextureUpdated;
         public event TextureEventHandler MaskTextureUpdated;
-        public event TextureEventHandler ForceTextureUpdated;
 
         public float MaxSpeed { get; private set; } = 1.0f;
 
@@ -113,8 +112,6 @@ namespace LatticeBoltzmannMethods
         // Simulation data. These are actively being updated frame to frame. Don't read from outside of jobs.
         private NativeArray<bool> _solid;
         private NativeArray<float2> _velocity;
-        private NativeArray<float2> _force;
-        private NativeArray<float2> _forceMinMaxResult;
         private NativeArray<float> _height;
         private NativeArray<float> _lastDistribution;
         private NativeArray<float> _newDistribution;
@@ -136,7 +133,6 @@ namespace LatticeBoltzmannMethods
         private Texture2D _flowTexture;
         private Texture2D _heightTexture;
         private Texture2D _maskTexture;
-        private Texture2D _forceTexture;
 
         private float _e;
         private float _inverseE;
@@ -192,7 +188,6 @@ namespace LatticeBoltzmannMethods
             _equilibriumDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight * 9, Allocator.Persistent);
             _height = new NativeArray<float>(_latticeWidth * _latticeHeight, Allocator.Persistent);
             _velocity = new NativeArray<float2>(_latticeWidth * _latticeHeight, Allocator.Persistent);
-            _force = new NativeArray<float2>(_latticeWidth * _latticeHeight, Allocator.Persistent);
 
             _solidResult = new NativeArray<bool>(_latticeWidth * _latticeHeight, Allocator.Persistent);
             _heightResult = new NativeArray<float>(_latticeWidth * _latticeHeight, Allocator.Persistent);
@@ -249,13 +244,6 @@ namespace LatticeBoltzmannMethods
             {
                 _velocity[nodeIdx] = _solid[nodeIdx] ? float2.zero : _initialVelocity;
             }
-
-            // Compute force from initial height.
-            for (var nodeIdx = 0; nodeIdx < _height.Length; nodeIdx++)
-            {
-                _force[nodeIdx] = _solid[nodeIdx] ? float2.zero : -GravitationalForce * _height[nodeIdx] * _bedSlope;
-            }
-            _forceMinMaxResult = new NativeArray<float2>(2, Allocator.Persistent);
 
             // The starting distribution will be the equilbrium distribution.
             {
@@ -314,17 +302,23 @@ namespace LatticeBoltzmannMethods
                 new CollideJob(
                     _simulationStepTime,
                     _latticeWidth,
+                    _latticeHeight,
                     _e,
                     inverseESq,
                     _applyEddyRelaxationTime,
                     _relaxationTime,
                     relaxationTimeSq,
                     smagorinskyConstantSq,
+                    GravitationalForce,
+                    _bedSlope,
+                    _applyShearForces,
                     _linkDirection,
+                    _linkOffsetX,
+                    _linkOffsetY,
                     _solid,
                     _equilibriumDistribution,
-                    _force,
                     _height,
+                    _velocity,
                     _lastDistribution);
             var streamJob =
                 new StreamJob(
@@ -346,20 +340,6 @@ namespace LatticeBoltzmannMethods
                     _newDistribution,
                     _height,
                     _velocity);
-            var updateForcesJob =
-                new UpdateForcesJob(
-                    _latticeWidth,
-                    _latticeHeight,
-                    GravitationalForce,
-                    _bedSlope,
-                    _applyShearForces,
-                    _linkDirection,
-                    _linkOffsetX,
-                    _linkOffsetY,
-                    _solid,
-                    _height,
-                    _velocity,
-                    _force);
             var computeEquilibriumDistributionJob =
                 new ComputeEquilibriumDistributionJob(
                     _latticeWidth,
@@ -421,14 +401,13 @@ namespace LatticeBoltzmannMethods
                     outflowJobHandle :
                     new FloodSolidHeightsJob(_latticeWidth, _solid, _height).Schedule(_latticeHeight - 1, 1, outflowJobHandle);
             var computeEquilibriumDistributionJobHandle = computeEquilibriumDistributionJob.Schedule(_latticeHeight, 1, floodHeightsJobHandle);
-            var updateForcesJobHandle = updateForcesJob.Schedule(_latticeHeight, 1, computeEquilibriumDistributionJobHandle);
 
             // And copy new distribution to the last distribution. This can run somewhat parallel to the simulation jobs.
             var copyNewDistributionToLastDistributionJobHandle = copyNewDistributionToLastDistributionJob.Schedule(outflowJobHandle);
             var fillNewDistributionJobHandle = fillNewDistributionJob.Schedule(copyNewDistributionToLastDistributionJobHandle);
 
             // Stash the job handles.
-            _lastJobHandles = (updateForcesJobHandle, fillNewDistributionJobHandle);
+            _lastJobHandles = (computeEquilibriumDistributionJobHandle, fillNewDistributionJobHandle);
         }
 
         private void OnDisable()
@@ -454,8 +433,6 @@ namespace LatticeBoltzmannMethods
             // Sim data
             _solid.Dispose();
             _velocity.Dispose();
-            _force.Dispose();
-            _forceMinMaxResult.Dispose();
             _height.Dispose();
             _lastDistribution.Dispose();
             _newDistribution.Dispose();
@@ -507,7 +484,6 @@ namespace LatticeBoltzmannMethods
                 new List<(JobHandle?, Texture2D, TextureEventHandler)>
                 {
                     UpdateMaskTexture(),
-                    UpdateForceTexture(),
                     UpdateHeightTexture(maxHeight),
                     UpdateFlowTexture(maxSpeed)
                 };
@@ -550,35 +526,6 @@ namespace LatticeBoltzmannMethods
             MaskTextureUpdated?.Invoke(this, _maskTexture);
 
             return (jobHandle, _maskTexture, MaskTextureUpdated);
-        }
-
-        private ValueTuple<JobHandle?, Texture2D, TextureEventHandler> UpdateForceTexture()
-        {
-            if (ForceTextureUpdated == null || ForceTextureUpdated.GetInvocationList().Length <= 0)
-            {
-                return NoTextureProcessedResult;
-            }
-
-            if (_forceTexture == null)
-            {
-                _forceTexture =
-                    new Texture2D(_latticeWidth, _latticeHeight, TextureFormat.RG16, mipChain: false, linear: true)
-                    {
-                        hideFlags = HideFlags.HideAndDontSave,
-                        wrapMode = TextureWrapMode.Clamp
-                    };
-            }
-
-            var computeMinMaxJob = new ComputeMinMaxFloat2Job(_force, _forceMinMaxResult);
-            var computeMinMaxJobHandle = computeMinMaxJob.Schedule();
-            var updateForceTextureJob = new UpdateForceTextureJob(_latticeWidth, _forceMinMaxResult, _force, _forceTexture.GetPixelData<byte>(0));
-            var updateForceTextureJobHandle = updateForceTextureJob.Schedule(_latticeHeight, 1, computeMinMaxJobHandle);
-            updateForceTextureJobHandle.Complete();
-            _forceTexture.Apply(false, false);
-
-            ForceTextureUpdated?.Invoke(this, _forceTexture);
-
-            return (updateForceTextureJobHandle, _forceTexture, ForceTextureUpdated);
         }
 
         private ValueTuple<JobHandle?, Texture2D, TextureEventHandler> UpdateFlowTexture(float maxSpeed)

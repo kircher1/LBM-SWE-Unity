@@ -680,16 +680,16 @@ MonoBehaviour:
   _latticeSpacingInMeters: 0.05
   _latticeWidth: 300
   _latticeHeight: 100
-  _startingHeight: 0.1
+  _startingHeight: 0.15
   _relaxationTime: 0.51
   _applyEddyRelaxationTime: 1
   _bedSlope:
-    x: -0.05
+    x: -0.00005
     y: 0
   _applyShearForces: 1
   _smagorinskyConstant: 0.18
   _textureScale: 0.618
-  _usePeriodicBoundary: 0
+  _inletOutletBoundaryCondition: 2
   _fixupSolidHeights: 1
   _showMarkers: 1
   _markerPrefab: {fileID: 0}
