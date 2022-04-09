@@ -106,15 +106,18 @@ namespace LatticeBoltzmannMethods
         private NativeArray<sbyte> _linkOffsetX;
         private NativeArray<sbyte> _linkOffsetY;
 
+        /// <summary>
+        /// Note, does not include origin link, which has direction (0, 0).
+        /// </summary>
         public NativeArray<float2> LinkDirection => _linkDirection;
 
         /// <summary>
-        /// Note, does not include origin link.
+        /// Note, does not include origin link, which has X-offset of 0.
         /// </summary>
         public NativeArray<sbyte> LinkOffsetX => _linkOffsetX;
 
         /// <summary>
-        /// Note, does not include origin link.
+        /// Note, does not include origin link, which has Y-offset of 0.
         /// </summary>
         public NativeArray<sbyte> LinkOffsetY => _linkOffsetY;
 
@@ -154,24 +157,24 @@ namespace LatticeBoltzmannMethods
             out NativeArray<sbyte> linkOffsetX,
             out NativeArray<sbyte> linkOffsetY)
         {
-            linkDirection = new NativeArray<float2>(9, Allocator.Persistent);
+            linkDirection = new NativeArray<float2>(8, Allocator.Persistent);
             linkOffsetX = new NativeArray<sbyte>(8, Allocator.Persistent);
             linkOffsetY = new NativeArray<sbyte>(8, Allocator.Persistent);
 
             var _linkOffsetX = new sbyte[] { 1,  1,  0, -1, -1, -1,  0,  1 };
             var _linkOffsetY = new sbyte[] { 0,  1,  1,  1,  0, -1, -1, -1 };
 
-            for (var linkIdx = 1; linkIdx < 9; linkIdx++)
+            for (var linkIdx = 0; linkIdx < 8; linkIdx++)
             {
-                var angle = PiOverFour * (linkIdx - 1);
+                var angle = PiOverFour * linkIdx;
                 linkDirection[linkIdx] = math.normalize(new float2(math.cos(angle), math.sin(angle)));
-                if (linkIdx % 2 == 0)
+                if (linkIdx % 2 == 1)
                 {
                     linkDirection[linkIdx] *= math.SQRT2;
                 }
 
-                linkOffsetX[linkIdx - 1] = _linkOffsetX[linkIdx - 1];
-                linkOffsetY[linkIdx - 1] = _linkOffsetY[linkIdx - 1];
+                linkOffsetX[linkIdx] = _linkOffsetX[linkIdx];
+                linkOffsetY[linkIdx] = _linkOffsetY[linkIdx];
             }
         }
 

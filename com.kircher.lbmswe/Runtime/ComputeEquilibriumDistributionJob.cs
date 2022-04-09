@@ -73,7 +73,7 @@ namespace LatticeBoltzmannMethods
                     - (5.0f / 6.0f) * inverseESq * gravityTimesHeightSq
                     - (2.0f / 3.0f) * inverseESq * height * sqMagnitudeOfVelocity;
 
-                for (var linkIdx = 1; linkIdx < 9; linkIdx++)
+                for (var linkIdx = 0; linkIdx < 8; linkIdx++)
                 {
                     var linkDirection = _e * _linkDirection[linkIdx];
                     var linkDirectionDotVelocity = math.dot(linkDirection, velocity);
@@ -82,17 +82,17 @@ namespace LatticeBoltzmannMethods
                         linkDirection.y * linkDirection.y * velocitySq.y +
                         2.0f * linkDirection.x * velocity.x * linkDirection.y * velocity.y;
 
-                    if (linkIdx % 2 == 1)
+                    if (linkIdx % 2 == 0)
                     {
-                        _equilibriumDistribution[9 * nodeIdx + linkIdx] =
+                        _equilibriumDistribution[9 * nodeIdx + linkIdx + 1] =
                               (1.0f / 6.0f) * inverseESq * gravityTimesHeightSq
                             + (1.0f / 3.0f) * inverseESq * height * linkDirectionDotVelocity
                             + (1.0f / 2.0f) * inverseEQd * height * bigVelocityTerm
                             - (1.0f / 6.0f) * inverseESq * height * sqMagnitudeOfVelocity;
                     }
-                    else // if (linkIdx % 2 == 0)
+                    else // if (linkIdx % 2 == 1)
                     {
-                        _equilibriumDistribution[9 * nodeIdx + linkIdx] =
+                        _equilibriumDistribution[9 * nodeIdx + linkIdx + 1] =
                               (1.0f / 24.0f) * inverseESq * gravityTimesHeightSq
                             + (1.0f / 12.0f) * inverseESq * height * linkDirectionDotVelocity
                             + (1.0f / 8.00f) * inverseEQd * height * bigVelocityTerm

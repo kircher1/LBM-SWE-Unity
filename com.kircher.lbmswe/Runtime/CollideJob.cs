@@ -123,10 +123,10 @@ namespace LatticeBoltzmannMethods
                     {
                         // Skipping link 0 since result for that link is always 0.
                         var momentumFluxTensor = 0.0f;
-                        for (var linkIdx = 1; linkIdx < 9; linkIdx++)
+                        for (var linkIdx = 0; linkIdx < 8; linkIdx++)
                         {
-                            var equilibriumDistribution = _equilibriumDistribution[9 * nodeIdx + linkIdx];
-                            var currentDistribution = _distribution[9 * nodeIdx + linkIdx];
+                            var equilibriumDistribution = _equilibriumDistribution[9 * nodeIdx + linkIdx + 1];
+                            var currentDistribution = _distribution[9 * nodeIdx + linkIdx + 1];
                             var distributionDelta = currentDistribution - equilibriumDistribution;
                             var linkDirection = _linkDirection[linkIdx];
                             momentumFluxTensor +=
@@ -156,13 +156,13 @@ namespace LatticeBoltzmannMethods
 
                     // Other links.
                     var forceTermCoefficient = (1.0f / 6.0f) * _e * _inverseESq * _deltaT;
-                    for (var linkIdx = 1; linkIdx < 9; linkIdx++)
+                    for (var linkIdx = 0; linkIdx < 8; linkIdx++)
                     {
-                        var equilibriumDistribution = _equilibriumDistribution[9 * nodeIdx + linkIdx];
-                        var currentDistribution = _distribution[9 * nodeIdx + linkIdx];
+                        var equilibriumDistribution = _equilibriumDistribution[9 * nodeIdx + linkIdx + 1];
+                        var currentDistribution = _distribution[9 * nodeIdx + linkIdx + 1];
                         var relaxationTerm = inverseRelaxationTime * (currentDistribution - equilibriumDistribution);
                         var forceTerm = ComputeForceTerm(rowIdx, colIdx, linkIdx, currentHeight, currentVelocity);
-                        _distribution[9 * nodeIdx + linkIdx] = currentDistribution - relaxationTerm + forceTermCoefficient * forceTerm;
+                        _distribution[9 * nodeIdx + linkIdx + 1] = currentDistribution - relaxationTerm + forceTermCoefficient * forceTerm;
                     }
                 }
             }
@@ -174,8 +174,8 @@ namespace LatticeBoltzmannMethods
         private float ComputeForceTerm(int rowIdx, int colIdx, int linkIdx, float currentHeight, float2 currentVelocity)
         {
             var linkDirection = _linkDirection[linkIdx];
-            var linkOffsetX = _linkOffsetX[linkIdx - 1];
-            var linkOffsetY = _linkOffsetY[linkIdx - 1];
+            var linkOffsetX = _linkOffsetX[linkIdx];
+            var linkOffsetY = _linkOffsetY[linkIdx];
 
             var neighborRowIdx = math.clamp(rowIdx + linkOffsetY, 0, _latticeHeight - 1);
             var neighborColIdx = math.clamp(colIdx + linkOffsetX, 0, _latticeWidth - 1);
@@ -191,19 +191,20 @@ namespace LatticeBoltzmannMethods
             if (_applyShearForces)
             {
                 // Also trying the centered scheme with velocity too... Not sure it's valid.
-                var neighborVelocity = isWallNeighbor ? float2.zero : _velocity[neighborIdx];
-                var centeredVelocity = 0.5f * (currentVelocity + neighborVelocity);
+                //var neighborVelocity = isWallNeighbor ? float2.zero : _velocity[neighborIdx];
+                var centeredVelocity = currentVelocity; // 0.5f * (currentVelocity + neighborVelocity);
                 var velocitySq = centeredVelocity * math.length(centeredVelocity);
 
                 var chezyCoefficient = math.pow(centeredHeight, 1.0f / 6.0f) / BottomManningsCoefficient;
                 var bedFrictionCoefficient = _gravitationalForce / (chezyCoefficient * chezyCoefficient);
                 bedShearStress = velocitySq * bedFrictionCoefficient;
 
-                if (isWallNeighbor)
-                {
-                    var wallFrictionCoefficient = -_gravitationalForce * WallManningsCoefficient * WallManningsCoefficient / math.pow(centeredHeight, 1.0f / 3.0f);
-                    wallShearStress = velocitySq * wallFrictionCoefficient;
-                }
+                // Collision is using a bounce back scheme so disable the additional wall friction for now.
+                //if (isWallNeighbor)
+                //{
+                //    var wallFrictionCoefficient = -_gravitationalForce * WallManningsCoefficient * WallManningsCoefficient / math.pow(centeredHeight, 1.0f / 3.0f);
+                //    wallShearStress = velocitySq * wallFrictionCoefficient;
+                //}
             }
 
             var gravitationalForce = _gravitationalForce * centeredHeight * _bedSlope;

@@ -64,9 +64,15 @@ namespace LatticeBoltzmannMethods
                 var velocity = float2.zero;
                 if (!_solid[nodeIdx])
                 {
-                    for (var linkIdx = 0; linkIdx < 9; linkIdx++)
+                    // Handle center link.
                     {
-                        var linkDistribution = _distribution[9 * nodeIdx + linkIdx];
+                        height += _distribution[9 * nodeIdx];
+                    }
+
+                    // Handle directional links.
+                    for (var linkIdx = 0; linkIdx < 8; linkIdx++)
+                    {
+                        var linkDistribution = _distribution[9 * nodeIdx + linkIdx + 1];
                         height += linkDistribution;
                         velocity += linkDistribution * _linkDirection[linkIdx];
                     }
@@ -99,13 +105,6 @@ namespace LatticeBoltzmannMethods
                         var scale = FroudeNumberLimit / froudeNumber;
                         velocity *= scale;
                     }
-
-                    // Rescale velocity so we don't blow up.
-                    //var speed = velocity.magnitude;
-                    //if (speed > maxSpeed)
-                    //{
-                    //    velocity *= maxSpeed / speed;
-                    //}
                 }
 
                 _height[nodeIdx] = height;
