@@ -689,7 +689,7 @@ MonoBehaviour:
   _applyShearForces: 1
   _smagorinskyConstant: 0.18
   _textureScale: 0.618
-  _inletOutletBoundaryCondition: 2
+  _inletOutletBoundaryCondition: 0
   _fixupSolidHeights: 1
   _showMarkers: 1
   _markerPrefab: {fileID: 0}
