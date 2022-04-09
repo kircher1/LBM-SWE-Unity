@@ -103,11 +103,20 @@ namespace LatticeBoltzmannMethods
         private static readonly float2 Half = new float2(0.5f, 0.5f);
 
         private NativeArray<float2> _linkDirection;
+        private NativeArray<sbyte> _linkOffsetX;
+        private NativeArray<sbyte> _linkOffsetY;
+
         public NativeArray<float2> LinkDirection => _linkDirection;
-        private NativeArray<int> _linkOffsetX;
-        public NativeArray<int> LinkOffsetX => _linkOffsetX;
-        private NativeArray<int> _linkOffsetY;
-        public NativeArray<int> LinkOffsetY => _linkOffsetY;
+
+        /// <summary>
+        /// Note, does not include origin link.
+        /// </summary>
+        public NativeArray<sbyte> LinkOffsetX => _linkOffsetX;
+
+        /// <summary>
+        /// Note, does not include origin link.
+        /// </summary>
+        public NativeArray<sbyte> LinkOffsetY => _linkOffsetY;
 
         // Simulation data. These are actively being updated frame to frame. Don't read from outside of jobs.
         private NativeArray<bool> _solid;
@@ -142,15 +151,15 @@ namespace LatticeBoltzmannMethods
 
         private static void InitializeLinkData(
             out NativeArray<float2> linkDirection,
-            out NativeArray<int> linkOffsetX,
-            out NativeArray<int> linkOffsetY)
+            out NativeArray<sbyte> linkOffsetX,
+            out NativeArray<sbyte> linkOffsetY)
         {
             linkDirection = new NativeArray<float2>(9, Allocator.Persistent);
-            linkOffsetX = new NativeArray<int>(9, Allocator.Persistent);
-            linkOffsetY = new NativeArray<int>(9, Allocator.Persistent);
+            linkOffsetX = new NativeArray<sbyte>(8, Allocator.Persistent);
+            linkOffsetY = new NativeArray<sbyte>(8, Allocator.Persistent);
 
-            var _linkOffsetX = new[] { 0,  1,  1,  0, -1, -1, -1,  0,  1 };
-            var _linkOffsetY = new[] { 0,  0,  1,  1,  1,  0, -1, -1, -1 };
+            var _linkOffsetX = new sbyte[] { 1,  1,  0, -1, -1, -1,  0,  1 };
+            var _linkOffsetY = new sbyte[] { 0,  1,  1,  1,  0, -1, -1, -1 };
 
             for (var linkIdx = 1; linkIdx < 9; linkIdx++)
             {
@@ -161,8 +170,8 @@ namespace LatticeBoltzmannMethods
                     linkDirection[linkIdx] *= math.SQRT2;
                 }
 
-                linkOffsetX[linkIdx] = _linkOffsetX[linkIdx];
-                linkOffsetY[linkIdx] = _linkOffsetY[linkIdx];
+                linkOffsetX[linkIdx - 1] = _linkOffsetX[linkIdx - 1];
+                linkOffsetY[linkIdx - 1] = _linkOffsetY[linkIdx - 1];
             }
         }
 

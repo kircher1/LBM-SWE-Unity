@@ -39,9 +39,9 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private NativeArray<float2> _linkDirection;
         [ReadOnly]
-        private NativeArray<int> _linkOffsetX;
+        private NativeArray<sbyte> _linkOffsetX;
         [ReadOnly]
-        private NativeArray<int> _linkOffsetY;
+        private NativeArray<sbyte> _linkOffsetY;
         [ReadOnly]
         private NativeArray<bool> _solid;
         [ReadOnly]
@@ -68,8 +68,8 @@ namespace LatticeBoltzmannMethods
             float2 bedSlope,
             bool applyShearForces,
             NativeArray<float2> linkDirection,
-            NativeArray<int> linkOffsetX,
-            NativeArray<int> linkOffsetY,
+            NativeArray<sbyte> linkOffsetX,
+            NativeArray<sbyte> linkOffsetY,
             NativeArray<bool> solid,
             NativeArray<float> equilibriumDistribution,
             NativeArray<float> height,
@@ -174,8 +174,8 @@ namespace LatticeBoltzmannMethods
         private float ComputeForceTerm(int rowIdx, int colIdx, int linkIdx, float currentHeight, float2 currentVelocity)
         {
             var linkDirection = _linkDirection[linkIdx];
-            var linkOffsetX = _linkOffsetX[linkIdx];
-            var linkOffsetY = _linkOffsetY[linkIdx];
+            var linkOffsetX = _linkOffsetX[linkIdx - 1];
+            var linkOffsetY = _linkOffsetY[linkIdx - 1];
 
             var neighborRowIdx = math.clamp(rowIdx + linkOffsetY, 0, _latticeHeight - 1);
             var neighborColIdx = math.clamp(colIdx + linkOffsetX, 0, _latticeWidth - 1);

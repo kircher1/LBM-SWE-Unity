@@ -14,9 +14,9 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private int _latticeHeight;
         [ReadOnly]
-        private NativeArray<int> _linkOffsetX;
+        private NativeArray<sbyte> _linkOffsetX;
         [ReadOnly]
-        private NativeArray<int> _linkOffsetY;
+        private NativeArray<sbyte> _linkOffsetY;
         [ReadOnly]
         private NativeArray<float> _lastDistribution;
 
@@ -27,8 +27,8 @@ namespace LatticeBoltzmannMethods
             bool usePreiodicBoundary,
             int latticeWidth,
             int latticeHeight,
-            NativeArray<int> linkOffsetX,
-            NativeArray<int> linkOffsetY,
+            NativeArray<sbyte> linkOffsetX,
+            NativeArray<sbyte> linkOffsetY,
             NativeArray<float> lastDistribution,
             NativeArray<float> distribution)
         {
@@ -47,10 +47,18 @@ namespace LatticeBoltzmannMethods
             for (var colIdx = 0; colIdx < _latticeWidth; colIdx++)
             {
                 var nodeIdx = rowStartIdx + colIdx;
-                for (var linkIdx = 0; linkIdx < 9; linkIdx++)
+
+                // Link 0
                 {
-                    var propagatedColIdx = colIdx + _linkOffsetX[linkIdx];
-                    var propagatedRowIdx = rowIdx + _linkOffsetY[linkIdx];
+                    var distributionToStream = _lastDistribution[9 * nodeIdx];
+                    _distribution[9 * nodeIdx] += distributionToStream;
+                }
+
+                // Remaining links.
+                for (var linkIdx = 1; linkIdx < 9; linkIdx++)
+                {
+                    var propagatedColIdx = colIdx + _linkOffsetX[linkIdx - 1];
+                    var propagatedRowIdx = rowIdx + _linkOffsetY[linkIdx - 1];
 
                     if (_usePeriodicBoundary)
                     {
