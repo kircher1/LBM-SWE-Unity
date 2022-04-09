@@ -121,21 +121,22 @@ namespace LatticeBoltzmannMethods
 
                     if (_applyEddyRelaxationTime)
                     {
+                        // Skipping link 0 since result for that link is always 0.
                         var momentumFluxTensor = 0.0f;
-                        for (var linkIdx = 0; linkIdx < 9; linkIdx++)
+                        for (var linkIdx = 1; linkIdx < 9; linkIdx++)
                         {
                             var equilibriumDistribution = _equilibriumDistribution[9 * nodeIdx + linkIdx];
                             var currentDistribution = _distribution[9 * nodeIdx + linkIdx];
                             var distributionDelta = currentDistribution - equilibriumDistribution;
-                            var linkDirection = _e * _linkDirection[linkIdx];
+                            var linkDirection = _linkDirection[linkIdx];
                             momentumFluxTensor +=
                                 distributionDelta *
                                 (linkDirection.x * linkDirection.x
                                     + 2.0f * linkDirection.x * linkDirection.y
                                     + linkDirection.y * linkDirection.y);
                         }
+                        momentumFluxTensor = _e * math.abs(momentumFluxTensor);
 
-                        momentumFluxTensor = math.abs(momentumFluxTensor);
                         var totalRelaxationTime =
                             0.5f * (
                                 _relaxationTime +
@@ -191,7 +192,7 @@ namespace LatticeBoltzmannMethods
             {
                 // Also trying the centered scheme with velocity too... Not sure it's valid.
                 var neighborVelocity = isWallNeighbor ? float2.zero : _velocity[neighborIdx];
-                var centeredVelocity = currentVelocity; // 0.5f * (currentVelocity + neighborVelocity);
+                var centeredVelocity = 0.5f * (currentVelocity + neighborVelocity);
                 var velocitySq = centeredVelocity * math.length(centeredVelocity);
 
                 var chezyCoefficient = math.pow(centeredHeight, 1.0f / 6.0f) / BottomManningsCoefficient;
