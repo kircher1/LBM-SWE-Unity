@@ -21,6 +21,7 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private NativeArray<float2> _velocity;
 
+        [WriteOnly]
         [NativeDisableParallelForRestriction]
         private NativeArray<byte> _destination;
 

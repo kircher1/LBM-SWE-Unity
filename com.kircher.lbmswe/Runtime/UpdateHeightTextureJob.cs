@@ -15,6 +15,7 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private NativeArray<float> _waterHeight;
 
+        [WriteOnly]
         [NativeDisableParallelForRestriction]
         private NativeArray<half> _destination;
 

@@ -11,6 +11,8 @@ namespace LatticeBoltzmannMethods
         private int _textureWidth;
         [ReadOnly]
         private NativeArray<bool> _solid;
+
+        [WriteOnly]
         [NativeDisableParallelForRestriction]
         private NativeArray<byte> _destination;
 

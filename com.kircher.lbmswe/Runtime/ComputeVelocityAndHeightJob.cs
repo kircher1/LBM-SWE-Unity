@@ -9,6 +9,8 @@ namespace LatticeBoltzmannMethods
     public struct ComputeVelocityAndHeightJob : IJobParallelFor
     {
         [ReadOnly]
+        private bool _usePeriodicBoundary;
+        [ReadOnly]
         private int _latticeWidth;
         [ReadOnly]
         private float _e;
@@ -25,13 +27,16 @@ namespace LatticeBoltzmannMethods
         [NativeDisableParallelForRestriction]
         private NativeArray<float> _distribution;
 
-        // Out
+        [WriteOnly]
         [NativeDisableParallelForRestriction]
         private NativeArray<float> _height;
+
+        [WriteOnly]
         [NativeDisableParallelForRestriction]
         private NativeArray<float2> _velocity;
 
         public ComputeVelocityAndHeightJob(
+            bool usePeriodicBoundary,
             int latticeWidth,
             float e,
             float maxHeight,
@@ -42,6 +47,7 @@ namespace LatticeBoltzmannMethods
             NativeArray<float> height,
             NativeArray<float2> velocity)
         {
+            _usePeriodicBoundary = usePeriodicBoundary;
             _latticeWidth = latticeWidth;
             _e = e;
             _maxHeight = maxHeight;
@@ -55,9 +61,11 @@ namespace LatticeBoltzmannMethods
 
         public void Execute(int rowIdx)
         {
-            // Note, inflow and outflow jobs are responsible for updating height/velocity for inlet/outlet nodes.
+            // Note, inflow and outflow jobs are responsible for updating height/velocity for inlet/outlet nodes,
+            // unless a periodic boundary is being used.
+            var columnSqueeze = _usePeriodicBoundary ? 1 : 0;
             var rowStartIdx = rowIdx * _latticeWidth;
-            for (var colIdx = 1; colIdx < _latticeWidth - 1; colIdx++)
+            for (var colIdx = columnSqueeze; colIdx < _latticeWidth - columnSqueeze; colIdx++)
             {
                 var nodeIdx = rowStartIdx + colIdx;
                 var height = 0.0f;

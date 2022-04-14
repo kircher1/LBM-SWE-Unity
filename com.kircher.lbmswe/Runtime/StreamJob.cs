@@ -20,6 +20,7 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private NativeArray<float> _lastDistribution;
 
+        [WriteOnly]
         [NativeDisableParallelForRestriction]
         private NativeArray<float> _distribution;
 
@@ -50,8 +51,7 @@ namespace LatticeBoltzmannMethods
 
                 // Link 0
                 {
-                    var distributionToStream = _lastDistribution[9 * nodeIdx];
-                    _distribution[9 * nodeIdx] += distributionToStream;
+                    _distribution[9 * nodeIdx] = _lastDistribution[9 * nodeIdx];
                 }
 
                 // Remaining links.
@@ -72,7 +72,7 @@ namespace LatticeBoltzmannMethods
                     {
                         var distributionToStream = _lastDistribution[9 * nodeIdx + linkIdx];
                         var propagatedIdx = propagatedRowIdx * _latticeWidth + propagatedColIdx;
-                        _distribution[9 * propagatedIdx + linkIdx] += distributionToStream;
+                        _distribution[9 * propagatedIdx + linkIdx] = distributionToStream;
                     }
                 }
             }

@@ -10,6 +10,8 @@ namespace LatticeBoltzmannMethods
     {
         [ReadOnly]
         private NativeArray<float> _src;
+
+        [WriteOnly]
         private NativeArray<float> _dst;
 
         public CopyJob(NativeArray<float> src, NativeArray<float> dst)

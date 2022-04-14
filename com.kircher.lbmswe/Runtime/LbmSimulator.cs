@@ -46,13 +46,7 @@ namespace LatticeBoltzmannMethods
         private float _relaxationTime = 0.51f;
 
         [SerializeField]
-        private bool _applyEddyRelaxationTime = true;
-
-        [SerializeField]
         private float2 _bedSlope = new float2(-0.005f, 0.0f);
-
-        [SerializeField]
-        private bool _applyShearForces = false;
 
         [SerializeField]
         [Range(0.06f, 0.5f)]
@@ -295,7 +289,7 @@ namespace LatticeBoltzmannMethods
                 // And copy latest solid to sim solid. Now is safe to do this.
                 NativeArray<bool>.Copy(_solidResult, _solid);
 
-                SimulationStepCompleted?.Invoke(this, new EventArgs());
+                SimulationStepCompleted?.Invoke(this, EventArgs.Empty);
 
                 // After jobs complete, update any textures and markers.
                 UpdateTextures(_maxHeight, MaxSpeed);
@@ -317,13 +311,11 @@ namespace LatticeBoltzmannMethods
                     _latticeHeight,
                     _e,
                     inverseESq,
-                    _applyEddyRelaxationTime,
                     _relaxationTime,
                     relaxationTimeSq,
                     smagorinskyConstantSq,
                     GravitationalForce,
                     _bedSlope,
-                    _applyShearForces,
                     _linkDirection,
                     _linkOffsetX,
                     _linkOffsetY,
@@ -343,6 +335,7 @@ namespace LatticeBoltzmannMethods
                     _newDistribution);
             var computeVelocityAndHeightJob =
                 new ComputeVelocityAndHeightJob(
+                    usePeriodicBoundary,
                     _latticeWidth,
                     _e,
                     _maxHeight,
@@ -508,6 +501,7 @@ namespace LatticeBoltzmannMethods
                 }
 
                 processedTexture.Item1.Value.Complete();
+                processedTexture.Item2.Apply(false, false);
                 processedTexture.Item3.Invoke(this, processedTexture.Item2);
             }
         }
@@ -532,10 +526,6 @@ namespace LatticeBoltzmannMethods
             var maskTextureData = _maskTexture.GetPixelData<byte>(0);
             var updateMaskTextureJob = new UpdateMaskTextureJob(_latticeWidth, _solidResult, maskTextureData);
             var jobHandle = updateMaskTextureJob.Schedule(_latticeHeight, 1);
-            jobHandle.Complete();
-            _maskTexture.Apply(false, false);
-
-            MaskTextureUpdated?.Invoke(this, _maskTexture);
 
             return (jobHandle, _maskTexture, MaskTextureUpdated);
         }
@@ -557,10 +547,6 @@ namespace LatticeBoltzmannMethods
             var flowTextureData = _flowTexture.GetPixelData<byte>(0);
             var updateFlowTexture = new UpdateFlowTextureJob(_latticeWidth, maxSpeed, _textureScale, _solidResult, _velocity, flowTextureData);
             var jobHandle = updateFlowTexture.Schedule(_latticeHeight, 1);
-            jobHandle.Complete();
-            _flowTexture.Apply(false, false);
-
-            FlowTextureUpdated?.Invoke(this, _flowTexture);
 
             return (jobHandle, _flowTexture, FlowTextureUpdated);
         }
@@ -583,10 +569,6 @@ namespace LatticeBoltzmannMethods
             var adjustedMax = _textureScale * maxHeight;
             var updateHeightTextureJob = new UpdateHeightTextureJob(_latticeWidth, adjustedMax, _height, pixelData);
             var jobHandle = updateHeightTextureJob.Schedule(_latticeHeight, 1);
-            jobHandle.Complete();
-            _heightTexture.Apply(false, false);
-
-            HeightTextureUpdated?.Invoke(this, _heightTexture);
 
             return (jobHandle, _heightTexture, HeightTextureUpdated);
         }

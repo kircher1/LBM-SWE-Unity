@@ -23,6 +23,7 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private NativeArray<float2> _velocity;
 
+        [WriteOnly]
         [NativeDisableParallelForRestriction]
         private NativeArray<float> _equilibriumDistribution; // output
 

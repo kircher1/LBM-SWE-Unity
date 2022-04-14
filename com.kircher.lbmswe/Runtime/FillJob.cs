@@ -7,6 +7,7 @@ namespace LatticeBoltzmannMethods
     [BurstCompile]
     public struct FillJob : IJob
     {
+        [WriteOnly]
         private NativeArray<float> _array;
 
         public FillJob(NativeArray<float> array)

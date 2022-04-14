@@ -1,16 +1,20 @@
-﻿using Unity.Burst;
+﻿using System.Runtime.CompilerServices;
+using Unity.Burst;
+using Unity.Burst.CompilerServices;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 
 namespace LatticeBoltzmannMethods
 {
-    [BurstCompile]
+    [BurstCompile(FloatPrecision.Standard, FloatMode.Fast)]
     public struct CollideJob : IJobParallelFor
     {
+        #if LBM_APPLY_SHEAR_FORCES
         // Found a table of manning's coefficients here: https://www.engineeringtoolbox.com/mannings-roughness-d_799.html
-        private const float WallManningsCoefficient = 0.025f;
+        // private const float WallManningsCoefficient = 0.025f;
         private const float BottomManningsCoefficient = 0.025f;
+        #endif
 
         [ReadOnly]
         private float _deltaT;
@@ -23,8 +27,6 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private float _inverseESq;
         [ReadOnly]
-        private bool _applyEddyRelaxationTime;
-        [ReadOnly]
         private float _relaxationTime;
         [ReadOnly]
         private float _relaxationTimeSq;
@@ -34,8 +36,6 @@ namespace LatticeBoltzmannMethods
         private float _gravitationalForce;
         [ReadOnly]
         private float2 _bedSlope;
-        [ReadOnly]
-        private bool _applyShearForces;
         [ReadOnly]
         private NativeArray<float2> _linkDirection;
         [ReadOnly]
@@ -60,13 +60,11 @@ namespace LatticeBoltzmannMethods
             int latticeHeight,
             float e,
             float inverseESq,
-            bool applyEddyRelaxationTime,
             float relaxationTime,
             float relaxationTimeSq,
             float smagorinskyConstantSq,
             float gravitationalForce,
             float2 bedSlope,
-            bool applyShearForces,
             NativeArray<float2> linkDirection,
             NativeArray<sbyte> linkOffsetX,
             NativeArray<sbyte> linkOffsetY,
@@ -81,13 +79,11 @@ namespace LatticeBoltzmannMethods
             _latticeHeight = latticeHeight;
             _e = e;
             _inverseESq = inverseESq;
-            _applyEddyRelaxationTime = applyEddyRelaxationTime;
             _relaxationTime = relaxationTime;
             _relaxationTimeSq = relaxationTimeSq;
             _smagorinskyConstantSq = smagorinskyConstantSq;
             _gravitationalForce = gravitationalForce;
             _bedSlope = bedSlope;
-            _applyShearForces = applyShearForces;
             _linkDirection = linkDirection;
             _linkOffsetX = linkOffsetX;
             _linkOffsetY = linkOffsetY;
@@ -119,12 +115,13 @@ namespace LatticeBoltzmannMethods
                     var currentHeight = _height[nodeIdx];
                     var currentVelocity = _velocity[nodeIdx];
 
-                    if (_applyEddyRelaxationTime)
+                    #if LBM_APPLY_EDDY_RELAXATION_TIME
                     {
                         // Skipping link 0 since result for that link is always 0.
                         var momentumFluxTensor = 0.0f;
                         for (var linkIdx = 0; linkIdx < 8; linkIdx++)
                         {
+                            //Loop.ExpectVectorized();
                             var equilibriumDistribution = _equilibriumDistribution[9 * nodeIdx + linkIdx + 1];
                             var currentDistribution = _distribution[9 * nodeIdx + linkIdx + 1];
                             var distributionDelta = currentDistribution - equilibriumDistribution;
@@ -145,6 +142,7 @@ namespace LatticeBoltzmannMethods
 
                         inverseRelaxationTime = 1.0f / totalRelaxationTime;
                     }
+                    #endif
 
                     // Link 0.
                     {
@@ -158,6 +156,7 @@ namespace LatticeBoltzmannMethods
                     var forceTermCoefficient = (1.0f / 6.0f) * _e * _inverseESq * _deltaT;
                     for (var linkIdx = 0; linkIdx < 8; linkIdx++)
                     {
+                        //Loop.ExpectVectorized();
                         var equilibriumDistribution = _equilibriumDistribution[9 * nodeIdx + linkIdx + 1];
                         var currentDistribution = _distribution[9 * nodeIdx + linkIdx + 1];
                         var relaxationTerm = inverseRelaxationTime * (currentDistribution - equilibriumDistribution);
@@ -171,12 +170,14 @@ namespace LatticeBoltzmannMethods
         /// <summary>
         /// Computes the force term between the current node (specified by rowIdx and colIdx) and it's neighboring node specified by the linkIdx.
         /// </summary>
-        private float ComputeForceTerm(int rowIdx, int colIdx, int linkIdx, float currentHeight, float2 currentVelocity)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private float ComputeForceTerm(int rowIdx, int colIdx, [AssumeRange(0, 8)] int linkIdx, float currentHeight, float2 currentVelocity)
         {
             var linkDirection = _linkDirection[linkIdx];
             var linkOffsetX = _linkOffsetX[linkIdx];
             var linkOffsetY = _linkOffsetY[linkIdx];
 
+            // TODO: Handle periodic boundary.
             var neighborRowIdx = math.clamp(rowIdx + linkOffsetY, 0, _latticeHeight - 1);
             var neighborColIdx = math.clamp(colIdx + linkOffsetX, 0, _latticeWidth - 1);
             var neighborIdx = neighborRowIdx * _latticeWidth + neighborColIdx;
@@ -185,10 +186,9 @@ namespace LatticeBoltzmannMethods
             var neighborHeight = isWallNeighbor ? currentHeight : _height[neighborIdx];
             var centeredHeight = 0.5f * (currentHeight + neighborHeight);
 
-            var bedShearStress = float2.zero;
-            var wallShearStress = float2.zero;
+            var gravitationalForce = _gravitationalForce * centeredHeight * _bedSlope;
 
-            if (_applyShearForces)
+            #if LBM_APPLY_SHEAR_FORCES
             {
                 // Also trying the centered scheme with velocity too... Not sure it's valid.
                 //var neighborVelocity = isWallNeighbor ? float2.zero : _velocity[neighborIdx];
@@ -197,7 +197,7 @@ namespace LatticeBoltzmannMethods
 
                 var chezyCoefficient = math.pow(centeredHeight, 1.0f / 6.0f) / BottomManningsCoefficient;
                 var bedFrictionCoefficient = _gravitationalForce / (chezyCoefficient * chezyCoefficient);
-                bedShearStress = velocitySq * bedFrictionCoefficient;
+                var bedShearStress = velocitySq * bedFrictionCoefficient;
 
                 // Collision is using a bounce back scheme so disable the additional wall friction for now.
                 //if (isWallNeighbor)
@@ -205,11 +205,14 @@ namespace LatticeBoltzmannMethods
                 //    var wallFrictionCoefficient = -_gravitationalForce * WallManningsCoefficient * WallManningsCoefficient / math.pow(centeredHeight, 1.0f / 3.0f);
                 //    wallShearStress = velocitySq * wallFrictionCoefficient;
                 //}
+
+                return math.dot(linkDirection, -gravitationalForce - bedShearStress/* + wallShearStress*/);
             }
-
-            var gravitationalForce = _gravitationalForce * centeredHeight * _bedSlope;
-
-            return math.dot(linkDirection, -gravitationalForce - bedShearStress + wallShearStress);
+            #else
+            {
+                return math.dot(linkDirection, -gravitationalForce);
+            }
+            #endif
         }
     }
 }

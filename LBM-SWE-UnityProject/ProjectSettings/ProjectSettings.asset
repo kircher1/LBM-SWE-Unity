@@ -153,6 +153,7 @@ PlayerSettings:
   androidSupportedAspectRatio: 1
   androidMaxAspectRatio: 2.1
   applicationIdentifier:
+    Android: com.DefaultCompany.LBMSWEUnityProject
     Standalone: com.DefaultCompany.LBM-SWE-UnityProject
   buildNumber:
     Standalone: 0
@@ -700,7 +701,9 @@ PlayerSettings:
   webGLLinkerTarget: 1
   webGLThreadsSupport: 0
   webGLDecompressionFallback: 0
-  scriptingDefineSymbols: {}
+  scriptingDefineSymbols:
+    Android: UNITY_BURST_EXPERIMENTAL_LOOP_INTRINSICS;LBM_APPLY_SHEAR_FORCES;LBM_APPLY_EDDY_RELAXATION_TIME
+    Standalone: UNITY_BURST_EXPERIMENTAL_LOOP_INTRINSICS;LBM_APPLY_SHEAR_FORCES;LBM_APPLY_EDDY_RELAXATION_TIME
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend:
