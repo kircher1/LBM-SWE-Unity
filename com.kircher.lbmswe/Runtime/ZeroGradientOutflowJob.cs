@@ -16,7 +16,7 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private int _latticeHeight;
         [ReadOnly]
-        private NativeArray<bool> _solid;
+        private NativeArray<byte> _solid;
 
         private NativeArray<float> _distribution;
         private NativeArray<float> _height;
@@ -25,7 +25,7 @@ namespace LatticeBoltzmannMethods
         public ZeroGradientOutflowJob(
             int latticeWidth,
             int latticeHeight,
-            NativeArray<bool> solid,
+            NativeArray<byte> solid,
             NativeArray<float> distribution,
             NativeArray<float> height,
             NativeArray<float2> velocity)
@@ -43,7 +43,7 @@ namespace LatticeBoltzmannMethods
             for (var rowIdx = 0; rowIdx < _latticeHeight; rowIdx++)
             {
                 var nodeIdx = rowIdx * _latticeWidth + _latticeWidth - 1;
-                if (_solid[nodeIdx] || _solid[nodeIdx - 1])
+                if (_solid[nodeIdx] == 0 || _solid[nodeIdx - 1] == 0)
                 {
                     continue;
                 }

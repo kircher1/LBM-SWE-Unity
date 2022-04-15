@@ -53,10 +53,6 @@ namespace LatticeBoltzmannMethods
         private float _smagorinskyConstant = 0.18f;
 
         [SerializeField]
-        [Range(0.01f, 1f)]
-        private float _textureScale = 1.0f;
-
-        [SerializeField]
         private InletOutletBoundaryCondition _inletOutletBoundaryCondition = InletOutletBoundaryCondition.ZouHe;
 
         /// <summary>
@@ -116,7 +112,7 @@ namespace LatticeBoltzmannMethods
         public NativeArray<sbyte> LinkOffsetY => _linkOffsetY;
 
         // Simulation data. These are actively being updated frame to frame. Don't read from outside of jobs.
-        private NativeArray<bool> _solid;
+        private NativeArray<byte> _solid;
         private NativeArray<float2> _velocity;
         private NativeArray<float> _height;
         private NativeArray<float> _lastDistribution;
@@ -125,8 +121,11 @@ namespace LatticeBoltzmannMethods
         private ValueTuple<JobHandle, JobHandle>? _lastJobHandles = null;
 
         // Sim result data. This is what can be queried by clients.
-        private NativeArray<bool> _solidResult;
-        public NativeArray<bool> Solid => _solidResult;
+        private NativeArray<byte> _solidResult;
+        /// <summary>
+        /// Name will probably change to 'liquid', as currently the value is either 0 => solid, or 1 => liquid.
+        /// </summary>
+        public NativeArray<byte> Solid => _solidResult;
         private NativeArray<float2> _velocityResult;
         public NativeArray<float2> Velocity => _velocityResult;
         private NativeArray<float> _heightResult;
@@ -188,14 +187,17 @@ namespace LatticeBoltzmannMethods
                 return;
             }
 
-            _solid = new NativeArray<bool>(_latticeWidth * _latticeHeight, Allocator.Persistent);
+            _solid = new NativeArray<byte>(_latticeWidth * _latticeHeight, Allocator.Persistent);
+            for (var idx = 0; idx < _solid.Length; idx++)
+            {
+                _solid[idx] = 1;
+            }
             _lastDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight * 9, Allocator.Persistent);
             _newDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight * 9, Allocator.Persistent);
             _equilibriumDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight * 9, Allocator.Persistent);
             _height = new NativeArray<float>(_latticeWidth * _latticeHeight, Allocator.Persistent);
             _velocity = new NativeArray<float2>(_latticeWidth * _latticeHeight, Allocator.Persistent);
 
-            _solidResult = new NativeArray<bool>(_latticeWidth * _latticeHeight, Allocator.Persistent);
             _heightResult = new NativeArray<float>(_latticeWidth * _latticeHeight, Allocator.Persistent);
             _velocityResult = new NativeArray<float2>(_latticeWidth * _latticeHeight, Allocator.Persistent);
         }
@@ -209,23 +211,33 @@ namespace LatticeBoltzmannMethods
             // Fill in solid rails unless along top and bottom edge unless some solid nodes have already been set by someone else.
             if (!_solidResult.IsCreated)
             {
-                startupLog += "Added solid rails\r\n";
+                startupLog += "Added solid rails.\r\n";
                 for (var idx = 0; idx < _solid.Length; idx++)
                 {
-                    _solid[idx] = true;
+                    _solid[idx] = 0;
                 }
                 for (var rowIdx = 1; rowIdx < _latticeHeight - 1; rowIdx++)
                 {
                     var rowStartIdx = rowIdx * _latticeWidth;
                     for (var colIdx = 0; colIdx < _latticeWidth; colIdx++)
                     {
-                        _solid[rowStartIdx + colIdx] = false;
+                        _solid[rowStartIdx + colIdx] = 1;
                     }
                 }
+
+                // Ensure corners are liquid.
+                _solid[0] = 1;
+                _solid[_latticeWidth - 1] = 1;
+                _solid[(_latticeHeight - 1) * _latticeWidth] = 1;
+                _solid[(_latticeHeight - 1) * _latticeWidth + _latticeWidth - 1] = 1;
+
+                _solidResult = new NativeArray<byte>(_latticeWidth* _latticeHeight, Allocator.Persistent);
+                NativeArray<byte>.Copy(_solid, _solidResult);
             }
             else
             {
-                NativeArray<bool>.Copy(_solidResult, _solid);
+                startupLog += "Solid nodes previously set.\r\n";
+                NativeArray<byte>.Copy(_solidResult, _solid);
             }
 
             // Compute per-simulation terms.
@@ -240,7 +252,7 @@ namespace LatticeBoltzmannMethods
             startupLog += $"Initial height: {_initialHeight}\r\n";
             for (var nodeIdx = 0; nodeIdx < _height.Length; nodeIdx++)
             {
-                _height[nodeIdx] = _solid[nodeIdx] ? 0.0f : _initialHeight;
+                _height[nodeIdx] = _solid[nodeIdx] * _initialHeight;
             }
 
             // Set initial velocity, some factor of the max speed.
@@ -248,7 +260,7 @@ namespace LatticeBoltzmannMethods
             startupLog += $"Initial velocity: {_initialVelocity}\r\n";
             for (var nodeIdx = 0; nodeIdx < _velocity.Length; nodeIdx++)
             {
-                _velocity[nodeIdx] = _solid[nodeIdx] ? float2.zero : _initialVelocity;
+                _velocity[nodeIdx] = _solid[nodeIdx] * _initialVelocity;
             }
 
             // The starting distribution will be the equilbrium distribution.
@@ -287,7 +299,7 @@ namespace LatticeBoltzmannMethods
                 NativeArray<float2>.Copy(_velocity, _velocityResult);
 
                 // And copy latest solid to sim solid. Now is safe to do this.
-                NativeArray<bool>.Copy(_solidResult, _solid);
+                NativeArray<byte>.Copy(_solidResult, _solid);
 
                 SimulationStepCompleted?.Invoke(this, EventArgs.Empty);
 
@@ -474,26 +486,27 @@ namespace LatticeBoltzmannMethods
         {
             if (!_solidResult.IsCreated)
             {
-                InitializeNativeArrays();
+                _solidResult = new NativeArray<byte>(_latticeWidth * _latticeHeight, Allocator.Persistent);
+                for (var idx = 0; idx < _solidResult.Length; idx++)
+                {
+                    _solidResult[idx] = 1;
+                }
             }
 
             var clampedColRowIdx = math.clamp(colRowIdx, math.int2(0), math.int2(_latticeWidth - 1, _latticeHeight - 1));
             var nodeIdx = clampedColRowIdx.y * _latticeWidth + clampedColRowIdx.x;
-
-            _solidResult[nodeIdx] = true;
+            _solidResult[nodeIdx] = 0;
         }
 
+        private readonly List<ValueTuple<JobHandle?, Texture2D, TextureEventHandler>>  _textureProcessingList = new();
         private void UpdateTextures(float maxHeight, float maxSpeed)
         {
-            var textureProcessingList =
-                new List<(JobHandle?, Texture2D, TextureEventHandler)>
-                {
-                    UpdateMaskTexture(),
-                    UpdateHeightTexture(maxHeight),
-                    UpdateFlowTexture(maxSpeed)
-                };
+            _textureProcessingList.Clear();
+            _textureProcessingList.Add(UpdateMaskTexture());
+            _textureProcessingList.Add(UpdateHeightTexture(maxHeight));
+            _textureProcessingList.Add(UpdateFlowTexture(maxSpeed));
 
-            foreach (var processedTexture in textureProcessingList)
+            foreach (var processedTexture in _textureProcessingList)
             {
                 if (processedTexture.Item1 == null)
                 {
@@ -504,6 +517,8 @@ namespace LatticeBoltzmannMethods
                 processedTexture.Item2.Apply(false, false);
                 processedTexture.Item3.Invoke(this, processedTexture.Item2);
             }
+
+            _textureProcessingList.Clear();
         }
 
         private ValueTuple<JobHandle?, Texture2D, TextureEventHandler> UpdateMaskTexture()
@@ -524,7 +539,7 @@ namespace LatticeBoltzmannMethods
             }
 
             var maskTextureData = _maskTexture.GetPixelData<byte>(0);
-            var updateMaskTextureJob = new UpdateMaskTextureJob(_latticeWidth, _solidResult, maskTextureData);
+            var updateMaskTextureJob = new UpdateMaskTextureJob(_latticeWidth, _solid, maskTextureData);
             var jobHandle = updateMaskTextureJob.Schedule(_latticeHeight, 1);
 
             return (jobHandle, _maskTexture, MaskTextureUpdated);
@@ -545,7 +560,7 @@ namespace LatticeBoltzmannMethods
             }
 
             var flowTextureData = _flowTexture.GetPixelData<byte>(0);
-            var updateFlowTexture = new UpdateFlowTextureJob(_latticeWidth, maxSpeed, _textureScale, _solidResult, _velocity, flowTextureData);
+            var updateFlowTexture = new UpdateFlowTextureJob(_latticeWidth, maxSpeed, _solid, _velocity, flowTextureData);
             var jobHandle = updateFlowTexture.Schedule(_latticeHeight, 1);
 
             return (jobHandle, _flowTexture, FlowTextureUpdated);
@@ -566,8 +581,7 @@ namespace LatticeBoltzmannMethods
             }
 
             var pixelData = _heightTexture.GetPixelData<half>(0);
-            var adjustedMax = _textureScale * maxHeight;
-            var updateHeightTextureJob = new UpdateHeightTextureJob(_latticeWidth, adjustedMax, _height, pixelData);
+            var updateHeightTextureJob = new UpdateHeightTextureJob(_latticeWidth, maxHeight, _height, pixelData);
             var jobHandle = updateHeightTextureJob.Schedule(_latticeHeight, 1);
 
             return (jobHandle, _heightTexture, HeightTextureUpdated);

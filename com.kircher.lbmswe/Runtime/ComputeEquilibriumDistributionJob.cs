@@ -17,7 +17,7 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private NativeArray<float2> _linkDirection;
         [ReadOnly]
-        private NativeArray<bool> _solid;
+        private NativeArray<byte> _solid;
         [ReadOnly]
         private NativeArray<float> _height;
         [ReadOnly]
@@ -32,7 +32,7 @@ namespace LatticeBoltzmannMethods
             float e,
             float gravitationalForce,
             NativeArray<float2> linkDirection,
-            NativeArray<bool> solid,
+            NativeArray<byte> solid,
             NativeArray<float> height,
             NativeArray<float2> velocity,
             NativeArray<float> equilibriumDistribution)
@@ -55,7 +55,7 @@ namespace LatticeBoltzmannMethods
             for (var colIdx = 0; colIdx < _latticeWidth; colIdx++)
             {
                 var nodeIdx = rowStartIdx + colIdx;
-                if (_solid[nodeIdx])
+                if (_solid[nodeIdx] == 0)
                 {
                     continue;
                 }

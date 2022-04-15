@@ -20,7 +20,7 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private float _inverseE;
         [ReadOnly]
-        private NativeArray<bool> _solid;
+        private NativeArray<byte> _solid;
         [ReadOnly]
         private float _inletWaterHeight;
         [ReadOnly]
@@ -34,7 +34,7 @@ namespace LatticeBoltzmannMethods
             int latticeWidth,
             int latticeHeight,
             float inverseE,
-            NativeArray<bool> solid,
+            NativeArray<byte> solid,
             float inletWaterHeight,
             float2 inletVelocity,
             NativeArray<float> distribution,
@@ -65,7 +65,7 @@ namespace LatticeBoltzmannMethods
                 var nodeIdx = rowIdx * _latticeWidth;
 
                 // Really, this assumes no solid nodes on inlet column, but skip if encountered node is solid.
-                if (_solid[nodeIdx])
+                if (_solid[nodeIdx] == 0)
                 {
                     continue;
                 }

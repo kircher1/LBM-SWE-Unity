@@ -16,7 +16,7 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private int _latticeHeight;
         [ReadOnly]
-        private NativeArray<bool> _solid;
+        private NativeArray<byte> _solid;
         [ReadOnly]
         private float _inletWaterHeight;
         [ReadOnly]
@@ -29,7 +29,7 @@ namespace LatticeBoltzmannMethods
         public ZeroGradientInflowJob(
             int latticeWidth,
             int latticeHeight,
-            NativeArray<bool> solid,
+            NativeArray<byte> solid,
             float inletWaterHeight,
             float2 inletVelocity,
             NativeArray<float> distribution,
@@ -51,7 +51,7 @@ namespace LatticeBoltzmannMethods
             for (var rowIdx = 0; rowIdx < _latticeHeight; rowIdx++)
             {
                 var nodeIdx = rowIdx * _latticeWidth;
-                if (_solid[nodeIdx] || _solid[nodeIdx + 1])
+                if (_solid[nodeIdx] == 0 || _solid[nodeIdx + 1] == 0)
                 {
                     continue;
                 }

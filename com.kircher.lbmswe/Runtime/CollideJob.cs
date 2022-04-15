@@ -43,7 +43,7 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private NativeArray<sbyte> _linkOffsetY;
         [ReadOnly]
-        private NativeArray<bool> _solid;
+        private NativeArray<byte> _solid;
         [ReadOnly]
         private NativeArray<float> _equilibriumDistribution;
         [ReadOnly]
@@ -68,7 +68,7 @@ namespace LatticeBoltzmannMethods
             NativeArray<float2> linkDirection,
             NativeArray<sbyte> linkOffsetX,
             NativeArray<sbyte> linkOffsetY,
-            NativeArray<bool> solid,
+            NativeArray<byte> solid,
             NativeArray<float> equilibriumDistribution,
             NativeArray<float> height,
             NativeArray<float2> velocity,
@@ -96,12 +96,17 @@ namespace LatticeBoltzmannMethods
 
         public void Execute(int rowIdx)
         {
+            var forceTermCoefficient = (1.0f / 6.0f) * _e * _inverseESq * _deltaT;
+            #if LBM_APPLY_EDDY_RELAXATION_TIME
+                var momentumFluxTensorTerm = 18.0f * _smagorinskyConstantSq * _inverseESq;
+            #endif
+
             var inverseRelaxationTime = 1.0f / _relaxationTime;
             var rowStartIdx = rowIdx * _latticeWidth;
             for (var colIdx = 0; colIdx < _latticeWidth; colIdx++)
             {
                 var nodeIdx = rowStartIdx + colIdx;
-                if (_solid[nodeIdx])
+                if (_solid[nodeIdx] == 0)
                 {
                     // bounce back
                     float temp;
@@ -117,7 +122,7 @@ namespace LatticeBoltzmannMethods
 
                     #if LBM_APPLY_EDDY_RELAXATION_TIME
                     {
-                        // Skipping link 0 since result for that link is always 0.
+                        // Skipping actual link 0 since result for that link is always 0.
                         var momentumFluxTensor = 0.0f;
                         for (var linkIdx = 0; linkIdx < 8; linkIdx++)
                         {
@@ -138,7 +143,7 @@ namespace LatticeBoltzmannMethods
                             0.5f * (
                                 _relaxationTime +
                                 math.sqrt(
-                                    _relaxationTimeSq + 18.0f * _smagorinskyConstantSq * momentumFluxTensor * _inverseESq / currentHeight));
+                                    _relaxationTimeSq + momentumFluxTensorTerm * momentumFluxTensor / currentHeight));
 
                         inverseRelaxationTime = 1.0f / totalRelaxationTime;
                     }
@@ -153,7 +158,6 @@ namespace LatticeBoltzmannMethods
                     }
 
                     // Other links.
-                    var forceTermCoefficient = (1.0f / 6.0f) * _e * _inverseESq * _deltaT;
                     for (var linkIdx = 0; linkIdx < 8; linkIdx++)
                     {
                         //Loop.ExpectVectorized();
@@ -182,8 +186,7 @@ namespace LatticeBoltzmannMethods
             var neighborColIdx = math.clamp(colIdx + linkOffsetX, 0, _latticeWidth - 1);
             var neighborIdx = neighborRowIdx * _latticeWidth + neighborColIdx;
 
-            var isWallNeighbor = _solid[neighborIdx];
-            var neighborHeight = isWallNeighbor ? currentHeight : _height[neighborIdx];
+            var neighborHeight = math.lerp(currentHeight, _height[neighborIdx], _solid[neighborIdx]);
             var centeredHeight = 0.5f * (currentHeight + neighborHeight);
 
             var gravitationalForce = _gravitationalForce * centeredHeight * _bedSlope;
@@ -203,7 +206,7 @@ namespace LatticeBoltzmannMethods
                 //if (isWallNeighbor)
                 //{
                 //    var wallFrictionCoefficient = -_gravitationalForce * WallManningsCoefficient * WallManningsCoefficient / math.pow(centeredHeight, 1.0f / 3.0f);
-                //    wallShearStress = velocitySq * wallFrictionCoefficient;
+                //    wallShearStress = (1.0f - _solid[neighborIdx]) * velocitySq * wallFrictionCoefficient;
                 //}
 
                 return math.dot(linkDirection, -gravitationalForce - bedShearStress/* + wallShearStress*/);

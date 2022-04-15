@@ -14,12 +14,12 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private int _latticeWidth;
         [ReadOnly]
-        private NativeArray<bool> _solid;
+        private NativeArray<byte> _solid;
 
         [NativeDisableParallelForRestriction]
         private NativeArray<float> _height;
 
-        public FloodSolidHeightsJob(int latticeWidth, NativeArray<bool> solid, NativeArray<float> height)
+        public FloodSolidHeightsJob(int latticeWidth, NativeArray<byte> solid, NativeArray<float> height)
         {
             _latticeWidth = latticeWidth;
             _solid = solid;
@@ -36,49 +36,49 @@ namespace LatticeBoltzmannMethods
             var rowStartIdx = rowIdx * _latticeWidth;
             for (var nodeIdx = rowStartIdx + 1; nodeIdx < rowStartIdx + _latticeWidth - 1; ++nodeIdx)
             {
-                if (!_solid[nodeIdx])
+                if (_solid[nodeIdx] == 1)
                 {
                     continue;
                 }
 
                 var count = 0;
                 var totalHeight = 0.0f;
-                if (!_solid[nodeIdx - _latticeWidth - 1])
+                if (_solid[nodeIdx - _latticeWidth - 1] == 1)
                 {
                     totalHeight += _height[nodeIdx - _latticeWidth - 1];
                     count++;
                 }
-                if (!_solid[nodeIdx - _latticeWidth])
+                if (_solid[nodeIdx - _latticeWidth] == 1)
                 {
                     totalHeight += _height[nodeIdx - _latticeWidth];
                     count++;
                 }
-                if (!_solid[nodeIdx - _latticeWidth + 1])
+                if (_solid[nodeIdx - _latticeWidth + 1] == 1)
                 {
                     totalHeight += _height[nodeIdx - _latticeWidth + 1];
                     count++;
                 }
-                if (!_solid[nodeIdx - 1])
+                if (_solid[nodeIdx - 1] == 1)
                 {
                     totalHeight += _height[nodeIdx - 1];
                     count++;
                 }
-                if (!_solid[nodeIdx + 1])
+                if (_solid[nodeIdx + 1] == 1)
                 {
                     totalHeight += _height[nodeIdx + 1];
                     count++;
                 }
-                if (!_solid[nodeIdx + _latticeWidth - 1])
+                if (_solid[nodeIdx + _latticeWidth - 1] == 1)
                 {
                     totalHeight += _height[nodeIdx + _latticeWidth - 1];
                     count++;
                 }
-                if (!_solid[nodeIdx + _latticeWidth])
+                if (_solid[nodeIdx + _latticeWidth] == 1)
                 {
                     totalHeight += _height[nodeIdx + _latticeWidth];
                     count++;
                 }
-                if (!_solid[nodeIdx + _latticeWidth + 1])
+                if (_solid[nodeIdx + _latticeWidth + 1] == 1)
                 {
                     totalHeight += _height[nodeIdx + _latticeWidth + 1];
                     count++;

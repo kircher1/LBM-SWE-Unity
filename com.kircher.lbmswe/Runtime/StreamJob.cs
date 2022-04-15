@@ -4,6 +4,7 @@ using Unity.Jobs;
 
 namespace LatticeBoltzmannMethods
 {
+    // TODO: Separate into one job for edge nodes and another job for the rest.
     [BurstCompile]
     public struct StreamJob : IJobParallelFor
     {

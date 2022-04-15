@@ -21,7 +21,7 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private NativeArray<float2> _linkDirection;
         [ReadOnly]
-        private NativeArray<bool> _solid;
+        private NativeArray<byte> _solid;
 
         // Inout
         [NativeDisableParallelForRestriction]
@@ -42,7 +42,7 @@ namespace LatticeBoltzmannMethods
             float maxHeight,
             float gravitationalForce,
             NativeArray<float2> linkDirection,
-            NativeArray<bool> solid,
+            NativeArray<byte> solid,
             NativeArray<float> distributuion,
             NativeArray<float> height,
             NativeArray<float2> velocity)
@@ -70,7 +70,7 @@ namespace LatticeBoltzmannMethods
                 var nodeIdx = rowStartIdx + colIdx;
                 var height = 0.0f;
                 var velocity = float2.zero;
-                if (!_solid[nodeIdx])
+                if (_solid[nodeIdx] == 1)
                 {
                     // Handle center link.
                     {

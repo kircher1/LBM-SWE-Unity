@@ -41,10 +41,10 @@ namespace LatticeBoltzmannMethods
                 out var upperRightIdx,
                 out var lowerRightIdx,
                 out float2 weights);
-            var upperLeft = lbmSimulator.Solid[upperLeftIdx] ? 1.0f : 0.0f;
-            var lowerLeft = lbmSimulator.Solid[lowerLeftIdx] ? 1.0f : 0.0f;
-            var upperRight = lbmSimulator.Solid[upperRightIdx] ? 1.0f : 0.0f;
-            var lowerRight = lbmSimulator.Solid[lowerRightIdx] ? 1.0f : 0.0f;
+            var upperLeft = 1.0f - lbmSimulator.Solid[upperLeftIdx];
+            var lowerLeft = 1.0f - lbmSimulator.Solid[lowerLeftIdx];
+            var upperRight = 1.0f - lbmSimulator.Solid[upperRightIdx];
+            var lowerRight = 1.0f - lbmSimulator.Solid[lowerRightIdx];
             return SamplingMath.LinearBlend(upperLeft, lowerLeft, upperRight, lowerRight, weights);
         }
 

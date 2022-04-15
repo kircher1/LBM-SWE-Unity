@@ -10,13 +10,13 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private int _textureWidth;
         [ReadOnly]
-        private NativeArray<bool> _solid;
+        private NativeArray<byte> _solid;
 
         [WriteOnly]
         [NativeDisableParallelForRestriction]
         private NativeArray<byte> _destination;
 
-        public UpdateMaskTextureJob(int textureWidth, NativeArray<bool> solid, NativeArray<byte> destination)
+        public UpdateMaskTextureJob(int textureWidth, NativeArray<byte> solid, NativeArray<byte> destination)
         {
             _textureWidth = textureWidth;
             _solid = solid;
@@ -28,7 +28,7 @@ namespace LatticeBoltzmannMethods
             var startIdx = rowIdx * _textureWidth;
             for (var idx = startIdx; idx < startIdx + _textureWidth; ++idx)
             {
-                _destination[idx] = _solid[idx] ? (byte)255 : (byte)0;
+                _destination[idx] = (byte)((1 - _solid[idx]) * 255);
             }
         }
     }
