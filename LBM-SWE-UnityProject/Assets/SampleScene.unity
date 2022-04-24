@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 705507994}
-  m_IndirectSpecularColor: {r: 0.44657898, g: 0.4964133, b: 0.5748178, a: 1}
+  m_IndirectSpecularColor: {r: 0.44657826, g: 0.49641263, b: 0.57481676, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -682,16 +682,14 @@ MonoBehaviour:
   _latticeHeight: 100
   _startingHeight: 0.15
   _relaxationTime: 0.51
-  _applyEddyRelaxationTime: 1
   _bedSlope:
     x: -0.00005
     y: 0
-  _applyShearForces: 1
   _smagorinskyConstant: 0.18
   _textureScale: 0.618
   _inletOutletBoundaryCondition: 0
   _fixupSolidHeights: 1
-  _showMarkers: 1
+  _showMarkers: 0
   _markerPrefab: {fileID: 0}
   _markerFrequency: 5
   _dumpStats: 0

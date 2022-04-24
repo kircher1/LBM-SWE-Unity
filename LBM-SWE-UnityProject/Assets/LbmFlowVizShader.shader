@@ -3,7 +3,7 @@ Shader "Lattice Boltzmann Methods/Flow Viz"
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
-        _VelocityPower("Velocity Power", float) = 0.4
+        _VelocityPower("Velocity Power", Range(0.0001, 100)) = 0.4
         _FreeChannelScale ("Free Channel Scale", float) = 0.8
     }
     SubShader
@@ -47,6 +47,7 @@ Shader "Lattice Boltzmann Methods/Flow Viz"
             {
                 fixed4 col = tex2D(_MainTex, i.uv);
                 fixed2 velocity = 2.0 * col.rg - 1.0;
+                //return pow(_FreeChannelScale * col, _VelocityPower);
 
                 // Scale blue with the speed.
                 //col.b = length(velocity) / sqrt(2);

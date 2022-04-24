@@ -29,10 +29,6 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private float _relaxationTime;
         [ReadOnly]
-        private float _relaxationTimeSq;
-        [ReadOnly]
-        private float _smagorinskyConstantSq;
-        [ReadOnly]
         private float _gravitationalForce;
         [ReadOnly]
         private float2 _bedSlope;
@@ -50,6 +46,8 @@ namespace LatticeBoltzmannMethods
         private NativeArray<float> _height;
         [ReadOnly]
         private NativeArray<float2> _velocity;
+        [ReadOnly]
+        private NativeArray<float> _inverseEddyRelaxationTime;
 
         [NativeDisableParallelForRestriction]
         private NativeArray<float> _distribution;
@@ -61,8 +59,6 @@ namespace LatticeBoltzmannMethods
             float e,
             float inverseESq,
             float relaxationTime,
-            float relaxationTimeSq,
-            float smagorinskyConstantSq,
             float gravitationalForce,
             float2 bedSlope,
             NativeArray<float2> linkDirection,
@@ -72,7 +68,8 @@ namespace LatticeBoltzmannMethods
             NativeArray<float> equilibriumDistribution,
             NativeArray<float> height,
             NativeArray<float2> velocity,
-            NativeArray<float> distribution)
+            NativeArray<float> distribution,
+            NativeArray<float> inverseEddyRelaxationTime)
         {
             _deltaT = deltaT;
             _latticeWidth = latticeWidth;
@@ -80,8 +77,6 @@ namespace LatticeBoltzmannMethods
             _e = e;
             _inverseESq = inverseESq;
             _relaxationTime = relaxationTime;
-            _relaxationTimeSq = relaxationTimeSq;
-            _smagorinskyConstantSq = smagorinskyConstantSq;
             _gravitationalForce = gravitationalForce;
             _bedSlope = bedSlope;
             _linkDirection = linkDirection;
@@ -92,80 +87,61 @@ namespace LatticeBoltzmannMethods
             _height = height;
             _velocity = velocity;
             _distribution = distribution;
+            _inverseEddyRelaxationTime = inverseEddyRelaxationTime;
         }
 
         public void Execute(int rowIdx)
         {
             var forceTermCoefficient = (1.0f / 6.0f) * _e * _inverseESq * _deltaT;
-            #if LBM_APPLY_EDDY_RELAXATION_TIME
-                var momentumFluxTensorTerm = 18.0f * _smagorinskyConstantSq * _inverseESq;
-            #endif
 
-            var inverseRelaxationTime = 1.0f / _relaxationTime;
             var rowStartIdx = rowIdx * _latticeWidth;
             for (var colIdx = 0; colIdx < _latticeWidth; colIdx++)
             {
                 var nodeIdx = rowStartIdx + colIdx;
+                var nodeOffset = 9 * nodeIdx;
                 if (_solid[nodeIdx] == 0)
                 {
-                    // bounce back
                     float temp;
-                    temp = _distribution[9 * nodeIdx + 1]; _distribution[9 * nodeIdx + 1] = _distribution[9 * nodeIdx + 5]; _distribution[9 * nodeIdx + 5] = temp;
-                    temp = _distribution[9 * nodeIdx + 2]; _distribution[9 * nodeIdx + 2] = _distribution[9 * nodeIdx + 6]; _distribution[9 * nodeIdx + 6] = temp;
-                    temp = _distribution[9 * nodeIdx + 3]; _distribution[9 * nodeIdx + 3] = _distribution[9 * nodeIdx + 7]; _distribution[9 * nodeIdx + 7] = temp;
-                    temp = _distribution[9 * nodeIdx + 4]; _distribution[9 * nodeIdx + 4] = _distribution[9 * nodeIdx + 8]; _distribution[9 * nodeIdx + 8] = temp;
+                    // swap 1 <---> 5
+                    temp = _distribution[nodeOffset + 1];
+                    _distribution[nodeOffset + 1] = _distribution[nodeOffset + 5];
+                    _distribution[nodeOffset + 5] = temp;
+                    // swap 2 <---> 6
+                    temp = _distribution[nodeOffset + 2];
+                    _distribution[nodeOffset + 2] = _distribution[nodeOffset + 6];
+                    _distribution[nodeOffset + 6] = temp;
+                    // swap 3 <---> 7
+                    temp = _distribution[nodeOffset + 3];
+                    _distribution[nodeOffset + 3] = _distribution[nodeOffset + 7];
+                    _distribution[nodeOffset + 7] = temp;
+                    // swap 4 <---> 8
+                    temp = _distribution[nodeOffset + 4];
+                    _distribution[nodeOffset + 4] = _distribution[nodeOffset + 8];
+                    _distribution[nodeOffset + 8] = temp;
                 }
                 else
                 {
                     var currentHeight = _height[nodeIdx];
                     var currentVelocity = _velocity[nodeIdx];
-
-                    #if LBM_APPLY_EDDY_RELAXATION_TIME
-                    {
-                        // Skipping actual link 0 since result for that link is always 0.
-                        var momentumFluxTensor = 0.0f;
-                        for (var linkIdx = 0; linkIdx < 8; linkIdx++)
-                        {
-                            //Loop.ExpectVectorized();
-                            var equilibriumDistribution = _equilibriumDistribution[9 * nodeIdx + linkIdx + 1];
-                            var currentDistribution = _distribution[9 * nodeIdx + linkIdx + 1];
-                            var distributionDelta = currentDistribution - equilibriumDistribution;
-                            var linkDirection = _linkDirection[linkIdx];
-                            momentumFluxTensor +=
-                                distributionDelta *
-                                (linkDirection.x * linkDirection.x
-                                    + 2.0f * linkDirection.x * linkDirection.y
-                                    + linkDirection.y * linkDirection.y);
-                        }
-                        momentumFluxTensor = _e * math.abs(momentumFluxTensor);
-
-                        var totalRelaxationTime =
-                            0.5f * (
-                                _relaxationTime +
-                                math.sqrt(
-                                    _relaxationTimeSq + momentumFluxTensorTerm * momentumFluxTensor / currentHeight));
-
-                        inverseRelaxationTime = 1.0f / totalRelaxationTime;
-                    }
-                    #endif
+                    var inverseRelaxationTime = _inverseEddyRelaxationTime[nodeIdx];
 
                     // Link 0.
                     {
-                        var equilibriumDistribution = _equilibriumDistribution[9 * nodeIdx];
-                        var currentDistribution = _distribution[9 * nodeIdx];
+                        var equilibriumDistribution = _equilibriumDistribution[nodeOffset];
+                        var currentDistribution = _distribution[nodeOffset];
                         var relaxationTerm = inverseRelaxationTime * (currentDistribution - equilibriumDistribution);
-                        _distribution[9 * nodeIdx] = currentDistribution - relaxationTerm;
+                        _distribution[nodeOffset] = currentDistribution - relaxationTerm;
                     }
 
                     // Other links.
                     for (var linkIdx = 0; linkIdx < 8; linkIdx++)
                     {
                         //Loop.ExpectVectorized();
-                        var equilibriumDistribution = _equilibriumDistribution[9 * nodeIdx + linkIdx + 1];
-                        var currentDistribution = _distribution[9 * nodeIdx + linkIdx + 1];
+                        var equilibriumDistribution = _equilibriumDistribution[nodeOffset + linkIdx + 1];
+                        var currentDistribution = _distribution[nodeOffset + linkIdx + 1];
                         var relaxationTerm = inverseRelaxationTime * (currentDistribution - equilibriumDistribution);
                         var forceTerm = ComputeForceTerm(rowIdx, colIdx, linkIdx, currentHeight, currentVelocity);
-                        _distribution[9 * nodeIdx + linkIdx + 1] = currentDistribution - relaxationTerm + forceTermCoefficient * forceTerm;
+                        _distribution[nodeOffset + linkIdx + 1] = currentDistribution - relaxationTerm + forceTermCoefficient * forceTerm;
                     }
                 }
             }

@@ -42,7 +42,7 @@ namespace LatticeBoltzmannMethods
         private float _startingHeight = 0.1f;
 
         [SerializeField]
-        [Range(0.51f, 2.0f)]
+        [Range(0.501f, 2.0f)]
         private float _relaxationTime = 0.51f;
 
         [SerializeField]
@@ -118,6 +118,7 @@ namespace LatticeBoltzmannMethods
         private NativeArray<float> _lastDistribution;
         private NativeArray<float> _newDistribution;
         private NativeArray<float> _equilibriumDistribution;
+        public NativeArray<float> _inverseEddyRelaxationTime;
         private ValueTuple<JobHandle, JobHandle>? _lastJobHandles = null;
 
         // Sim result data. This is what can be queried by clients.
@@ -195,6 +196,7 @@ namespace LatticeBoltzmannMethods
             _lastDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight * 9, Allocator.Persistent);
             _newDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight * 9, Allocator.Persistent);
             _equilibriumDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight * 9, Allocator.Persistent);
+            _inverseEddyRelaxationTime = new NativeArray<float>(_latticeWidth * _latticeHeight, Allocator.Persistent);
             _height = new NativeArray<float>(_latticeWidth * _latticeHeight, Allocator.Persistent);
             _velocity = new NativeArray<float2>(_latticeWidth * _latticeHeight, Allocator.Persistent);
 
@@ -226,10 +228,10 @@ namespace LatticeBoltzmannMethods
                 }
 
                 // Ensure corners are liquid.
-                _solid[0] = 1;
-                _solid[_latticeWidth - 1] = 1;
-                _solid[(_latticeHeight - 1) * _latticeWidth] = 1;
-                _solid[(_latticeHeight - 1) * _latticeWidth + _latticeWidth - 1] = 1;
+                //_solid[0] = 1;
+                //_solid[_latticeWidth - 1] = 1;
+                //_solid[(_latticeHeight - 1) * _latticeWidth] = 1;
+                //_solid[(_latticeHeight - 1) * _latticeWidth + _latticeWidth - 1] = 1;
 
                 _solidResult = new NativeArray<byte>(_latticeWidth* _latticeHeight, Allocator.Persistent);
                 NativeArray<byte>.Copy(_solid, _solidResult);
@@ -316,6 +318,20 @@ namespace LatticeBoltzmannMethods
 
             // Setup jobs.
             var usePeriodicBoundary = _inletOutletBoundaryCondition == InletOutletBoundaryCondition.Periodic;
+            var eddyRelaxationTimeJob =
+                new EddyRelaxationTimeJob(
+                    _latticeWidth,
+                    _e,
+                    inverseESq,
+                    _relaxationTime,
+                    relaxationTimeSq,
+                    smagorinskyConstantSq,
+                    _linkDirection,
+                    _solid,
+                    _equilibriumDistribution,
+                    _height,
+                    _lastDistribution,
+                    _inverseEddyRelaxationTime);
             var collideJob =
                 new CollideJob(
                     _simulationStepTime,
@@ -324,8 +340,6 @@ namespace LatticeBoltzmannMethods
                     _e,
                     inverseESq,
                     _relaxationTime,
-                    relaxationTimeSq,
-                    smagorinskyConstantSq,
                     GravitationalForce,
                     _bedSlope,
                     _linkDirection,
@@ -335,7 +349,8 @@ namespace LatticeBoltzmannMethods
                     _equilibriumDistribution,
                     _height,
                     _velocity,
-                    _lastDistribution);
+                    _lastDistribution,
+                    _inverseEddyRelaxationTime);
             var streamJob =
                 new StreamJob(
                     usePeriodicBoundary,
@@ -371,7 +386,8 @@ namespace LatticeBoltzmannMethods
             var fillNewDistributionJob = new FillJob(_newDistribution);
 
             // Schedule simulation jobs.
-            var collideJobHandle = collideJob.Schedule(_latticeHeight, 1);
+            var eddyRelaxationTimeJobHandle = eddyRelaxationTimeJob.Schedule(LatticeHeight, 1);
+            var collideJobHandle = collideJob.Schedule(_latticeHeight, 1, eddyRelaxationTimeJobHandle);
             var streamJobHandle = streamJob.Schedule(_latticeHeight, 1, collideJobHandle);
             var computeVelocityAndHeightJobHandle = computeVelocityAndHeightJob.Schedule(_latticeHeight, 1, streamJobHandle);
             var inflowJobHandle =
@@ -454,6 +470,7 @@ namespace LatticeBoltzmannMethods
             _lastDistribution.Dispose();
             _newDistribution.Dispose();
             _equilibriumDistribution.Dispose();
+            _inverseEddyRelaxationTime.Dispose();
 
             // Result data.
             _solidResult.Dispose();
