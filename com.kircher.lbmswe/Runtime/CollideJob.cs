@@ -52,6 +52,9 @@ namespace LatticeBoltzmannMethods
         [NativeDisableParallelForRestriction]
         private NativeArray<float> _distribution;
 
+        [ReadOnly]
+        private float _forceTermCoefficient;
+
         public CollideJob(
             float deltaT,
             int latticeWidth,
@@ -88,19 +91,21 @@ namespace LatticeBoltzmannMethods
             _velocity = velocity;
             _distribution = distribution;
             _inverseEddyRelaxationTime = inverseEddyRelaxationTime;
+
+            _forceTermCoefficient = (1.0f / 6.0f) * _e * _inverseESq * _deltaT;
         }
 
         public void Execute(int rowIdx)
         {
-            var forceTermCoefficient = (1.0f / 6.0f) * _e * _inverseESq * _deltaT;
-
             var rowStartIdx = rowIdx * _latticeWidth;
+
+            // Apply bounce back to solidn nodes.
             for (var colIdx = 0; colIdx < _latticeWidth; colIdx++)
             {
                 var nodeIdx = rowStartIdx + colIdx;
-                var nodeOffset = 9 * nodeIdx;
                 if (_solid[nodeIdx] == 0)
                 {
+                    var nodeOffset = 9 * nodeIdx;
                     float temp;
                     // swap 1 <---> 5
                     temp = _distribution[nodeOffset + 1];
@@ -119,29 +124,42 @@ namespace LatticeBoltzmannMethods
                     _distribution[nodeOffset + 4] = _distribution[nodeOffset + 8];
                     _distribution[nodeOffset + 8] = temp;
                 }
-                else
+            }
+
+            // Update distributions for liquid link 0.
+            for (var colIdx = 0; colIdx < _latticeWidth; colIdx++)
+            {
+                var nodeIdx = rowStartIdx + colIdx;
+                if (_solid[nodeIdx] != 0)
                 {
+                    var inverseRelaxationTime = _inverseEddyRelaxationTime[nodeIdx];
+                    var nodeOffset = 9 * nodeIdx;
+                    var equilibriumDistribution = _equilibriumDistribution[nodeOffset];
+                    var currentDistribution = _distribution[nodeOffset];
+                    var relaxationTerm = inverseRelaxationTime * (currentDistribution - equilibriumDistribution);
+                    _distribution[nodeOffset] = currentDistribution - relaxationTerm;
+                }
+            }
+
+            // Update distributions, applying force term, for remaining links.
+            for (var colIdx = 0; colIdx < _latticeWidth; colIdx++)
+            {
+                var nodeIdx = rowStartIdx + colIdx;
+                if (_solid[nodeIdx] != 0)
+                {
+                    var inverseRelaxationTime = _inverseEddyRelaxationTime[nodeIdx];
                     var currentHeight = _height[nodeIdx];
                     var currentVelocity = _velocity[nodeIdx];
-                    var inverseRelaxationTime = _inverseEddyRelaxationTime[nodeIdx];
 
-                    // Link 0.
-                    {
-                        var equilibriumDistribution = _equilibriumDistribution[nodeOffset];
-                        var currentDistribution = _distribution[nodeOffset];
-                        var relaxationTerm = inverseRelaxationTime * (currentDistribution - equilibriumDistribution);
-                        _distribution[nodeOffset] = currentDistribution - relaxationTerm;
-                    }
-
-                    // Other links.
+                    var nodeOffset = 9 * nodeIdx + 1;
                     for (var linkIdx = 0; linkIdx < 8; linkIdx++)
                     {
                         //Loop.ExpectVectorized();
-                        var equilibriumDistribution = _equilibriumDistribution[nodeOffset + linkIdx + 1];
-                        var currentDistribution = _distribution[nodeOffset + linkIdx + 1];
+                        var equilibriumDistribution = _equilibriumDistribution[nodeOffset + linkIdx];
+                        var currentDistribution = _distribution[nodeOffset + linkIdx];
                         var relaxationTerm = inverseRelaxationTime * (currentDistribution - equilibriumDistribution);
                         var forceTerm = ComputeForceTerm(rowIdx, colIdx, linkIdx, currentHeight, currentVelocity);
-                        _distribution[nodeOffset + linkIdx + 1] = currentDistribution - relaxationTerm + forceTermCoefficient * forceTerm;
+                        _distribution[nodeOffset + linkIdx] = currentDistribution - relaxationTerm + _forceTermCoefficient * forceTerm;
                     }
                 }
             }
