@@ -40,6 +40,10 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private float _momentumFluxTensorTerm;
 
+        [ReadOnly]
+        [DeallocateOnJobCompletion]
+        private NativeArray<float4> _strainRateTensorValues;
+
         public EddyRelaxationTimeJob(
             int latticeWidth,
             float e,
@@ -68,6 +72,19 @@ namespace LatticeBoltzmannMethods
             _inverseEddyRelaxationTime = inverseEddyRelaxationTime;
 
             _momentumFluxTensorTerm = 18.0f * _smagorinskyConstantSq * _inverseESq;
+
+            // Precompute some intermediate values used to evaluate the magnitude of the momentum flux tensor.
+            _strainRateTensorValues = new NativeArray<float4>(8, Allocator.TempJob);
+            for (var linkIdx = 0; linkIdx < 8; linkIdx++)
+            {
+                var eLinkDirection = _e * _linkDirection[linkIdx];
+                _strainRateTensorValues[linkIdx] =
+                    new float4(
+                        eLinkDirection.x * eLinkDirection.x,
+                        eLinkDirection.x * eLinkDirection.y,
+                        eLinkDirection.y * eLinkDirection.x,
+                        eLinkDirection.y * eLinkDirection.y);
+            }
         }
 
         public void Execute(int rowIdx)
@@ -79,21 +96,18 @@ namespace LatticeBoltzmannMethods
                 var currentHeight = _height[nodeIdx];
 
                 // Skipping actual link 0 since result for that link is always 0.
-                // TODO: Convert to float3?
-                var momentumFluxTensorXX = 0.0f; var momentumFluxTensorXY = 0.0f; var momentumFluxTensorYY = 0.0f;
+                var nodeOffset = 9 * nodeIdx + 1;
+                var momentumFluxTensor = float4.zero; // really, a 2x2 matrix.
                 for (var linkIdx = 0; linkIdx < 8; linkIdx++)
                 {
                     //Loop.ExpectVectorized();
-                    var equilibriumDistribution = _equilibriumDistribution[9 * nodeIdx + linkIdx + 1];
-                    var currentDistribution = _distribution[9 * nodeIdx + linkIdx + 1];
+                    var equilibriumDistribution = _equilibriumDistribution[nodeOffset + linkIdx];
+                    var currentDistribution = _distribution[nodeOffset + linkIdx];
                     var nonEquilibriumDistribution = currentDistribution - equilibriumDistribution;
-                    var linkDirection = _e * _linkDirection[linkIdx]; // TODO: Precompute (and linkDirection xx/xy/yy).
-                    momentumFluxTensorXX += nonEquilibriumDistribution * linkDirection.x * linkDirection.x;
-                    momentumFluxTensorXY += nonEquilibriumDistribution * linkDirection.x * linkDirection.y;
-                    momentumFluxTensorYY += nonEquilibriumDistribution * linkDirection.y * linkDirection.y;
+                    momentumFluxTensor += nonEquilibriumDistribution * _strainRateTensorValues[linkIdx];
                 }
 
-                var doubleDotProduct = momentumFluxTensorXX * momentumFluxTensorXX + 2.0f * momentumFluxTensorXY * momentumFluxTensorXY + momentumFluxTensorYY * momentumFluxTensorYY;
+                var doubleDotProduct = math.dot(momentumFluxTensor, momentumFluxTensor);
                 var momentumFluxTensorMagnitude = math.sqrt(doubleDotProduct);
                 var turubulentTime = _momentumFluxTensorTerm * momentumFluxTensorMagnitude / currentHeight;
                 _inverseEddyRelaxationTime[nodeIdx] = _solid[nodeIdx] / (0.5f * (_relaxationTime + math.sqrt(_relaxationTimeSq + turubulentTime)));

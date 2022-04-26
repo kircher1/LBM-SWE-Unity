@@ -686,7 +686,6 @@ MonoBehaviour:
     x: -0.00005
     y: 0
   _smagorinskyConstant: 0.18
-  _textureScale: 0.618
   _inletOutletBoundaryCondition: 0
   _fixupSolidHeights: 1
   _showMarkers: 0
