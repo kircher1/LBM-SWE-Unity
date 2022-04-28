@@ -9,7 +9,7 @@ namespace LatticeBoltzmannMethods
     /// Computes a per-node eddy relaxation time using Smagorinsky SGS model.
     /// </summary>
     [BurstCompile(FloatPrecision.Standard, FloatMode.Fast)]
-    public struct EddyRelaxationTimeJob : IJobParallelFor
+    public struct ComputeEddyRelaxationTimeJob : IJobParallelFor
     {
         [ReadOnly]
         private int _latticeWidth;
@@ -44,7 +44,7 @@ namespace LatticeBoltzmannMethods
         [DeallocateOnJobCompletion]
         private NativeArray<float4> _strainRateTensorValues;
 
-        public EddyRelaxationTimeJob(
+        public ComputeEddyRelaxationTimeJob(
             int latticeWidth,
             float e,
             float inverseESq,

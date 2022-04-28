@@ -318,8 +318,8 @@ namespace LatticeBoltzmannMethods
 
             // Setup jobs.
             var usePeriodicBoundary = _inletOutletBoundaryCondition == InletOutletBoundaryCondition.Periodic;
-            var eddyRelaxationTimeJob =
-                new EddyRelaxationTimeJob(
+            var computeEddyRelaxationTimeJob =
+                new ComputeEddyRelaxationTimeJob(
                     _latticeWidth,
                     _e,
                     inverseESq,
@@ -386,7 +386,7 @@ namespace LatticeBoltzmannMethods
             var fillNewDistributionJob = new FillJob(_newDistribution);
 
             // Schedule simulation jobs.
-            var eddyRelaxationTimeJobHandle = eddyRelaxationTimeJob.Schedule(LatticeHeight, 1);
+            var eddyRelaxationTimeJobHandle = computeEddyRelaxationTimeJob.Schedule(LatticeHeight, 1);
             var collideJobHandle = collideJob.Schedule(_latticeHeight, 1, eddyRelaxationTimeJobHandle);
             var streamJobHandle = streamJob.Schedule(_latticeHeight, 1, collideJobHandle);
             var computeVelocityAndHeightJobHandle = computeVelocityAndHeightJob.Schedule(_latticeHeight, 1, streamJobHandle);
