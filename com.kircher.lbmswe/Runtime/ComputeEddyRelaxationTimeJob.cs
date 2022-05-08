@@ -34,6 +34,7 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private NativeArray<float> _distribution;
 
+        [WriteOnly]
         [NativeDisableParallelForRestriction]
         private NativeArray<float> _inverseEddyRelaxationTime;
 
@@ -96,7 +97,7 @@ namespace LatticeBoltzmannMethods
                 var currentHeight = _height[nodeIdx];
 
                 // Skipping actual link 0 since result for that link is always 0.
-                var nodeOffset = 9 * nodeIdx + 1;
+                var nodeOffset = 8 * nodeIdx;
                 var momentumFluxTensor = float4.zero; // really, a 2x2 matrix.
                 for (var linkIdx = 0; linkIdx < 8; linkIdx++)
                 {

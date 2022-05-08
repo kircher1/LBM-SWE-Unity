@@ -52,11 +52,11 @@ namespace LatticeBoltzmannMethods
                 {
                     // 2 and 3 also undertmined. Take from upper-left neighbor.
                     var neighborNodeIdx = nodeIdx + _latticeWidth - 1;
-                    _distribution[9 * nodeIdx + 2] = _distribution[9 * neighborNodeIdx + 2];
-                    _distribution[9 * nodeIdx + 3] = _distribution[9 * neighborNodeIdx + 3];
-                    _distribution[9 * nodeIdx + 4] = _distribution[9 * neighborNodeIdx + 4];
-                    _distribution[9 * nodeIdx + 5] = _distribution[9 * neighborNodeIdx + 5];
-                    _distribution[9 * nodeIdx + 6] = _distribution[9 * neighborNodeIdx + 6];
+                    _distribution[8 * nodeIdx + 1] = _distribution[8 * neighborNodeIdx + 1];
+                    _distribution[8 * nodeIdx + 2] = _distribution[8 * neighborNodeIdx + 2];
+                    _distribution[8 * nodeIdx + 3] = _distribution[8 * neighborNodeIdx + 3];
+                    _distribution[8 * nodeIdx + 4] = _distribution[8 * neighborNodeIdx + 4];
+                    _distribution[8 * nodeIdx + 5] = _distribution[8 * neighborNodeIdx + 5];
                     _velocity[nodeIdx] = _velocity[neighborNodeIdx];
                     _height[nodeIdx] = _height[neighborNodeIdx];
                 }
@@ -64,20 +64,20 @@ namespace LatticeBoltzmannMethods
                 {
                     // 7 and 8 also undertmined. Take from lower-left neighbor.
                     var neighborNodeIdx = nodeIdx - _latticeWidth - 1;
-                    _distribution[9 * nodeIdx + 4] = _distribution[9 * neighborNodeIdx + 4];
-                    _distribution[9 * nodeIdx + 5] = _distribution[9 * neighborNodeIdx + 5];
-                    _distribution[9 * nodeIdx + 6] = _distribution[9 * neighborNodeIdx + 6];
-                    _distribution[9 * nodeIdx + 7] = _distribution[9 * neighborNodeIdx + 7];
-                    _distribution[9 * nodeIdx + 8] = _distribution[9 * neighborNodeIdx + 8];
+                    _distribution[8 * nodeIdx + 3] = _distribution[8 * neighborNodeIdx + 3];
+                    _distribution[8 * nodeIdx + 4] = _distribution[8 * neighborNodeIdx + 4];
+                    _distribution[8 * nodeIdx + 5] = _distribution[8 * neighborNodeIdx + 5];
+                    _distribution[8 * nodeIdx + 6] = _distribution[8 * neighborNodeIdx + 6];
+                    _distribution[8 * nodeIdx + 7] = _distribution[8 * neighborNodeIdx + 7];
                     _velocity[nodeIdx] = _velocity[neighborNodeIdx];
                     _height[nodeIdx] = _height[neighborNodeIdx];
                 }
                 else
                 {
                     var neighborNodeIdx = nodeIdx - 1;
-                    _distribution[9 * nodeIdx + 4] = _distribution[9 * neighborNodeIdx + 4];
-                    _distribution[9 * nodeIdx + 5] = _distribution[9 * neighborNodeIdx + 5];
-                    _distribution[9 * nodeIdx + 6] = _distribution[9 * neighborNodeIdx + 6];
+                    _distribution[8 * nodeIdx + 3] = _distribution[8 * neighborNodeIdx + 3];
+                    _distribution[8 * nodeIdx + 4] = _distribution[8 * neighborNodeIdx + 4];
+                    _distribution[8 * nodeIdx + 5] = _distribution[8 * neighborNodeIdx + 5];
                     _velocity[nodeIdx] = _velocity[neighborNodeIdx];
                     _height[nodeIdx] = _height[neighborNodeIdx];
                 }

@@ -41,6 +41,8 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private NativeArray<byte> _solid;
         [ReadOnly]
+        private NativeArray<float> _restEquilibriumDistribution;
+        [ReadOnly]
         private NativeArray<float> _equilibriumDistribution;
         [ReadOnly]
         private NativeArray<float> _height;
@@ -49,6 +51,8 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private NativeArray<float> _inverseEddyRelaxationTime;
 
+        [NativeDisableParallelForRestriction]
+        private NativeArray<float> _restDistribution;
         [NativeDisableParallelForRestriction]
         private NativeArray<float> _distribution;
 
@@ -68,9 +72,11 @@ namespace LatticeBoltzmannMethods
             NativeArray<sbyte> linkOffsetX,
             NativeArray<sbyte> linkOffsetY,
             NativeArray<byte> solid,
+            NativeArray<float> restEquilibriumDistribution,
             NativeArray<float> equilibriumDistribution,
             NativeArray<float> height,
             NativeArray<float2> velocity,
+            NativeArray<float> restDistribution,
             NativeArray<float> distribution,
             NativeArray<float> inverseEddyRelaxationTime)
         {
@@ -86,9 +92,11 @@ namespace LatticeBoltzmannMethods
             _linkOffsetX = linkOffsetX;
             _linkOffsetY = linkOffsetY;
             _solid = solid;
+            _restEquilibriumDistribution = restEquilibriumDistribution;
             _equilibriumDistribution = equilibriumDistribution;
             _height = height;
             _velocity = velocity;
+            _restDistribution = restDistribution;
             _distribution = distribution;
             _inverseEddyRelaxationTime = inverseEddyRelaxationTime;
 
@@ -105,24 +113,24 @@ namespace LatticeBoltzmannMethods
                 var nodeIdx = rowStartIdx + colIdx;
                 if (_solid[nodeIdx] == 0)
                 {
-                    var nodeOffset = 9 * nodeIdx;
+                    var nodeOffset = 8 * nodeIdx;
                     float temp;
                     // swap 1 <---> 5
+                    temp = _distribution[nodeOffset + 0];
+                    _distribution[nodeOffset + 0] = _distribution[nodeOffset + 4];
+                    _distribution[nodeOffset + 4] = temp;
+                    // swap 2 <---> 6
                     temp = _distribution[nodeOffset + 1];
                     _distribution[nodeOffset + 1] = _distribution[nodeOffset + 5];
                     _distribution[nodeOffset + 5] = temp;
-                    // swap 2 <---> 6
+                    // swap 3 <---> 7
                     temp = _distribution[nodeOffset + 2];
                     _distribution[nodeOffset + 2] = _distribution[nodeOffset + 6];
                     _distribution[nodeOffset + 6] = temp;
-                    // swap 3 <---> 7
+                    // swap 4 <---> 8
                     temp = _distribution[nodeOffset + 3];
                     _distribution[nodeOffset + 3] = _distribution[nodeOffset + 7];
                     _distribution[nodeOffset + 7] = temp;
-                    // swap 4 <---> 8
-                    temp = _distribution[nodeOffset + 4];
-                    _distribution[nodeOffset + 4] = _distribution[nodeOffset + 8];
-                    _distribution[nodeOffset + 8] = temp;
                 }
             }
 
@@ -133,11 +141,10 @@ namespace LatticeBoltzmannMethods
                 if (_solid[nodeIdx] != 0)
                 {
                     var inverseRelaxationTime = _inverseEddyRelaxationTime[nodeIdx];
-                    var nodeOffset = 9 * nodeIdx;
-                    var equilibriumDistribution = _equilibriumDistribution[nodeOffset];
-                    var currentDistribution = _distribution[nodeOffset];
+                    var equilibriumDistribution = _restEquilibriumDistribution[nodeIdx];
+                    var currentDistribution = _restDistribution[nodeIdx];
                     var relaxationTerm = inverseRelaxationTime * (currentDistribution - equilibriumDistribution);
-                    _distribution[nodeOffset] = currentDistribution - relaxationTerm;
+                    _restDistribution[nodeIdx] = currentDistribution - relaxationTerm;
                 }
             }
 
@@ -151,7 +158,7 @@ namespace LatticeBoltzmannMethods
                     var currentHeight = _height[nodeIdx];
                     var currentVelocity = _velocity[nodeIdx];
 
-                    var nodeOffset = 9 * nodeIdx + 1;
+                    var nodeOffset = 8 * nodeIdx;
                     for (var linkIdx = 0; linkIdx < 8; linkIdx++)
                     {
                         //Loop.ExpectVectorized();
@@ -169,13 +176,15 @@ namespace LatticeBoltzmannMethods
         /// Computes the force term between the current node (specified by rowIdx and colIdx) and it's neighboring node specified by the linkIdx.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private float ComputeForceTerm(int rowIdx, int colIdx, [AssumeRange(0, 8)] int linkIdx, float currentHeight, float2 currentVelocity)
+        private float ComputeForceTerm(int rowIdx, int colIdx, [AssumeRange(0, 7)] int linkIdx, float currentHeight, float2 currentVelocity)
         {
             var linkDirection = _linkDirection[linkIdx];
             var linkOffsetX = _linkOffsetX[linkIdx];
             var linkOffsetY = _linkOffsetY[linkIdx];
 
             // TODO: Handle periodic boundary.
+            //var neighborRowIdx = ((rowIdx + linkOffsetY) % _latticeHeight) % _latticeHeight;
+            //var neighborColIdx = ((colIdx + linkOffsetX) % _latticeWidth) % _latticeWidth;
             var neighborRowIdx = math.clamp(rowIdx + linkOffsetY, 0, _latticeHeight - 1);
             var neighborColIdx = math.clamp(colIdx + linkOffsetX, 0, _latticeWidth - 1);
             var neighborIdx = neighborRowIdx * _latticeWidth + neighborColIdx;

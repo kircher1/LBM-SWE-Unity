@@ -26,6 +26,7 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private float2 _inletVelocity;
 
+        private NativeArray<float> _restDistribution;
         private NativeArray<float> _distribution;
         private NativeArray<float> _height;
         private NativeArray<float2> _velocity;
@@ -37,6 +38,7 @@ namespace LatticeBoltzmannMethods
             NativeArray<byte> solid,
             float inletWaterHeight,
             float2 inletVelocity,
+            NativeArray<float> restDistribution,
             NativeArray<float> distribution,
             NativeArray<float> height,
             NativeArray<float2> velocity)
@@ -52,6 +54,7 @@ namespace LatticeBoltzmannMethods
             _solid = solid;
             _inletWaterHeight = inletWaterHeight;
             _inletVelocity = inletVelocity;
+            _restDistribution = restDistribution;
             _distribution = distribution;
             _height = height;
             _velocity = velocity;
@@ -73,42 +76,42 @@ namespace LatticeBoltzmannMethods
                 if (rowIdx == 0) // Bottom-left corner. (only works if diagonally adjacent flow node is not solid.)
                 {
                     var neighborHeight = _height[nodeIdx + 1 + _latticeWidth];
-                    _distribution[9 * nodeIdx + 1] = _distribution[9 * nodeIdx + 5];
-                    _distribution[9 * nodeIdx + 2] = _distribution[9 * nodeIdx + 6];
-                    _distribution[9 * nodeIdx + 3] = _distribution[9 * nodeIdx + 7];
+                    _distribution[8 * nodeIdx + 0] = _distribution[8 * nodeIdx + 4];
+                    _distribution[8 * nodeIdx + 1] = _distribution[8 * nodeIdx + 5];
+                    _distribution[8 * nodeIdx + 2] = _distribution[8 * nodeIdx + 6];
                     var distributionSumFor4and8 =
-                        _distribution[9 * nodeIdx + 0] +
-                        _distribution[9 * nodeIdx + 1] +
-                        _distribution[9 * nodeIdx + 2] +
-                        _distribution[9 * nodeIdx + 3] +
-                        _distribution[9 * nodeIdx + 5] +
-                        _distribution[9 * nodeIdx + 6] +
-                        _distribution[9 * nodeIdx + 7];
-                    _distribution[9 * nodeIdx + 4] = _distribution[9 * nodeIdx + 8] = 0.5f * (neighborHeight - distributionSumFor4and8);
+                        _restDistribution[nodeIdx] +
+                        _distribution[8 * nodeIdx + 0] +
+                        _distribution[8 * nodeIdx + 1] +
+                        _distribution[8 * nodeIdx + 2] +
+                        _distribution[8 * nodeIdx + 4] +
+                        _distribution[8 * nodeIdx + 5] +
+                        _distribution[8 * nodeIdx + 6];
+                    _distribution[8 * nodeIdx + 3] = _distribution[8 * nodeIdx + 7] = 0.5f * (neighborHeight - distributionSumFor4and8);
                     _velocity[nodeIdx] = float2.zero;
                 }
                 else if (rowIdx == _latticeHeight - 1) // Top-left corner. (only works if diagonally adjacent flow node is not solid.)
                 {
                     var neighborHeight = _height[nodeIdx + 1 - _latticeWidth];
-                    _distribution[9 * nodeIdx + 1] = _distribution[9 * nodeIdx + 5];
-                    _distribution[9 * nodeIdx + 7] = _distribution[9 * nodeIdx + 3];
-                    _distribution[9 * nodeIdx + 8] = _distribution[9 * nodeIdx + 4];
+                    _distribution[8 * nodeIdx + 0] = _distribution[8 * nodeIdx + 4];
+                    _distribution[8 * nodeIdx + 6] = _distribution[8 * nodeIdx + 2];
+                    _distribution[8 * nodeIdx + 7] = _distribution[8 * nodeIdx + 3];
                     var distributionSumFor2and6 =
-                        _distribution[9 * nodeIdx + 0] +
-                        _distribution[9 * nodeIdx + 1] +
-                        _distribution[9 * nodeIdx + 3] +
-                        _distribution[9 * nodeIdx + 4] +
-                        _distribution[9 * nodeIdx + 5] +
-                        _distribution[9 * nodeIdx + 7] +
-                        _distribution[9 * nodeIdx + 8];
-                    _distribution[9 * nodeIdx + 2] = _distribution[9 * nodeIdx + 6] = 0.5f * (neighborHeight - distributionSumFor2and6);
+                        _restDistribution[nodeIdx] +
+                        _distribution[8 * nodeIdx + 0] +
+                        _distribution[8 * nodeIdx + 2] +
+                        _distribution[8 * nodeIdx + 3] +
+                        _distribution[8 * nodeIdx + 4] +
+                        _distribution[8 * nodeIdx + 6] +
+                        _distribution[8 * nodeIdx + 7];
+                    _distribution[8 * nodeIdx + 1] = _distribution[8 * nodeIdx + 5] = 0.5f * (neighborHeight - distributionSumFor2and6);
                     _velocity[nodeIdx] = float2.zero;
                 }
                 else // General case, not a corner.
                 {
-                    _distribution[9 * nodeIdx + 1] = _distribution[9 * nodeIdx + 5] + (2.0f / 3.0f) * _inverseE * _inletWaterHeight * u;
-                    _distribution[9 * nodeIdx + 2] = (1.0f / 6.0f) * _inverseE * _inletWaterHeight * u + _distribution[9 * nodeIdx + 6] + 0.5f * (_distribution[9 * nodeIdx + 7] - _distribution[9 * nodeIdx + 3]);
-                    _distribution[9 * nodeIdx + 8] = (1.0f / 6.0f) * _inverseE * _inletWaterHeight * u + _distribution[9 * nodeIdx + 4] + 0.5f * (_distribution[9 * nodeIdx + 3] - _distribution[9 * nodeIdx + 7]);
+                    _distribution[8 * nodeIdx + 0] = _distribution[8 * nodeIdx + 4] + (2.0f / 3.0f) * _inverseE * _inletWaterHeight * u;
+                    _distribution[8 * nodeIdx + 1] = (1.0f / 6.0f) * _inverseE * _inletWaterHeight * u + _distribution[8 * nodeIdx + 5] + 0.5f * (_distribution[8 * nodeIdx + 6] - _distribution[8 * nodeIdx + 2]);
+                    _distribution[8 * nodeIdx + 7] = (1.0f / 6.0f) * _inverseE * _inletWaterHeight * u + _distribution[8 * nodeIdx + 3] + 0.5f * (_distribution[8 * nodeIdx + 2] - _distribution[8 * nodeIdx + 6]);
                     _velocity[nodeIdx] = _inletVelocity;
                 }
 

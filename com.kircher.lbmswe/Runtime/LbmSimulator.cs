@@ -115,11 +115,14 @@ namespace LatticeBoltzmannMethods
         private NativeArray<byte> _solid;
         private NativeArray<float2> _velocity;
         private NativeArray<float> _height;
+        private NativeArray<float> _lastRestDistribution;
         private NativeArray<float> _lastDistribution;
+        private NativeArray<float> _newRestDistribution;
         private NativeArray<float> _newDistribution;
+        private NativeArray<float> _restEquilibriumDistribution;
         private NativeArray<float> _equilibriumDistribution;
         public NativeArray<float> _inverseEddyRelaxationTime;
-        private ValueTuple<JobHandle, JobHandle>? _lastJobHandles = null;
+        private ValueTuple<JobHandle, JobHandle, JobHandle>? _lastJobHandles = null;
 
         // Sim result data. This is what can be queried by clients.
         private NativeArray<byte> _solidResult;
@@ -193,9 +196,12 @@ namespace LatticeBoltzmannMethods
             {
                 _solid[idx] = 1;
             }
-            _lastDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight * 9, Allocator.Persistent);
-            _newDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight * 9, Allocator.Persistent);
-            _equilibriumDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight * 9, Allocator.Persistent);
+            _lastRestDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight, Allocator.Persistent);
+            _lastDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight * 8, Allocator.Persistent);
+            _newRestDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight, Allocator.Persistent);
+            _newDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight * 8, Allocator.Persistent);
+            _restEquilibriumDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight, Allocator.Persistent);
+            _equilibriumDistribution = new NativeArray<float>(_latticeWidth * _latticeHeight * 8, Allocator.Persistent);
             _inverseEddyRelaxationTime = new NativeArray<float>(_latticeWidth * _latticeHeight, Allocator.Persistent);
             _height = new NativeArray<float>(_latticeWidth * _latticeHeight, Allocator.Persistent);
             _velocity = new NativeArray<float2>(_latticeWidth * _latticeHeight, Allocator.Persistent);
@@ -273,15 +279,18 @@ namespace LatticeBoltzmannMethods
                          _e,
                         GravitationalForce,
                         _linkDirection,
-                        _solid,
                         _height,
                         _velocity,
+                        _restEquilibriumDistribution,
                         _equilibriumDistribution);
                 var computeEquilibriumDistributionJobHandle = computeEquilibriumDistributionJob.Schedule(_latticeHeight, 1);
 
-                // Copy equilibrium distribution into the starting distribution (_lastDistribution).
+                // Copy equilibrium distribution into the starting distribution.
+                var copyRestJob = new CopyJob(_restEquilibriumDistribution, _lastRestDistribution);
                 var copyJob = new CopyJob(_equilibriumDistribution, _lastDistribution);
                 var copyJobHandle = copyJob.Schedule(computeEquilibriumDistributionJobHandle);
+                var copyRestJobHandle = copyRestJob.Schedule(computeEquilibriumDistributionJobHandle);
+                copyRestJobHandle.Complete();
                 copyJobHandle.Complete();
             }
 
@@ -294,6 +303,7 @@ namespace LatticeBoltzmannMethods
             {
                 _lastJobHandles.Value.Item1.Complete();
                 _lastJobHandles.Value.Item2.Complete();
+                _lastJobHandles.Value.Item3.Complete();
                 _lastJobHandles = null;
 
                 // Copy sim data to results.
@@ -346,9 +356,11 @@ namespace LatticeBoltzmannMethods
                     _linkOffsetX,
                     _linkOffsetY,
                     _solid,
+                    _restEquilibriumDistribution,
                     _equilibriumDistribution,
                     _height,
                     _velocity,
+                    _lastRestDistribution,
                     _lastDistribution,
                     _inverseEddyRelaxationTime);
             var streamJob =
@@ -358,7 +370,9 @@ namespace LatticeBoltzmannMethods
                     _latticeHeight,
                     _linkOffsetX,
                     _linkOffsetY,
+                    _lastRestDistribution,
                     _lastDistribution,
+                    _newRestDistribution,
                     _newDistribution);
             var computeVelocityAndHeightJob =
                 new ComputeVelocityAndHeightJob(
@@ -369,6 +383,7 @@ namespace LatticeBoltzmannMethods
                     GravitationalForce,
                     _linkDirection,
                     _solid,
+                    _newRestDistribution,
                     _newDistribution,
                     _height,
                     _velocity);
@@ -378,11 +393,13 @@ namespace LatticeBoltzmannMethods
                      _e,
                     GravitationalForce,
                     _linkDirection,
-                    _solid,
                     _height,
                     _velocity,
+                    _restEquilibriumDistribution,
                     _equilibriumDistribution);
+            var copyNewRestDistributionToLastRestDistributionJob = new CopyJob(_newRestDistribution, _lastRestDistribution);
             var copyNewDistributionToLastDistributionJob = new CopyJob(_newDistribution, _lastDistribution);
+            var fillNewRestDistributionJob = new FillJob(_newRestDistribution);
             var fillNewDistributionJob = new FillJob(_newDistribution);
 
             // Schedule simulation jobs.
@@ -411,6 +428,7 @@ namespace LatticeBoltzmannMethods
                             _solid,
                             _initialHeight,
                             _initialVelocity,
+                            _newRestDistribution,
                             _newDistribution,
                             _height,
                             _velocity).
@@ -425,6 +443,7 @@ namespace LatticeBoltzmannMethods
                             _latticeHeight,
                             _inverseE,
                             _solid,
+                            _newRestDistribution,
                             _newDistribution,
                             _height,
                             _velocity).
@@ -436,11 +455,13 @@ namespace LatticeBoltzmannMethods
             var computeEquilibriumDistributionJobHandle = computeEquilibriumDistributionJob.Schedule(_latticeHeight, 1, floodHeightsJobHandle);
 
             // And copy new distribution to the last distribution. This can run somewhat parallel to the simulation jobs.
+            var copyNewRestDistributionToLastRestDistributionJobHandle = copyNewRestDistributionToLastRestDistributionJob.Schedule(outflowJobHandle);
+            var fillNewRestDistributionJobHandle = fillNewRestDistributionJob.Schedule(copyNewRestDistributionToLastRestDistributionJobHandle);
             var copyNewDistributionToLastDistributionJobHandle = copyNewDistributionToLastDistributionJob.Schedule(outflowJobHandle);
             var fillNewDistributionJobHandle = fillNewDistributionJob.Schedule(copyNewDistributionToLastDistributionJobHandle);
 
             // Stash the job handles.
-            _lastJobHandles = (computeEquilibriumDistributionJobHandle, fillNewDistributionJobHandle);
+            _lastJobHandles = (computeEquilibriumDistributionJobHandle, fillNewRestDistributionJobHandle, fillNewDistributionJobHandle);
         }
 
         private void OnDisable()
@@ -449,6 +470,7 @@ namespace LatticeBoltzmannMethods
             {
                 _lastJobHandles.Value.Item1.Complete();
                 _lastJobHandles.Value.Item2.Complete();
+                _lastJobHandles.Value.Item3.Complete();
                 _lastJobHandles = null;
             }
 
@@ -467,8 +489,11 @@ namespace LatticeBoltzmannMethods
             _solid.Dispose();
             _velocity.Dispose();
             _height.Dispose();
+            _lastRestDistribution.Dispose();
             _lastDistribution.Dispose();
+            _newRestDistribution.Dispose();
             _newDistribution.Dispose();
+            _restEquilibriumDistribution.Dispose();
             _equilibriumDistribution.Dispose();
             _inverseEddyRelaxationTime.Dispose();
 

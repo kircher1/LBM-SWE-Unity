@@ -25,6 +25,8 @@ namespace LatticeBoltzmannMethods
 
         // Inout
         [NativeDisableParallelForRestriction]
+        private NativeArray<float> _restDistribution;
+        [NativeDisableParallelForRestriction]
         private NativeArray<float> _distribution;
 
         [WriteOnly]
@@ -43,6 +45,7 @@ namespace LatticeBoltzmannMethods
             float gravitationalForce,
             NativeArray<float2> linkDirection,
             NativeArray<byte> solid,
+            NativeArray<float> restDistributuion,
             NativeArray<float> distributuion,
             NativeArray<float> height,
             NativeArray<float2> velocity)
@@ -54,6 +57,7 @@ namespace LatticeBoltzmannMethods
             _gravitationalForce = gravitationalForce;
             _linkDirection = linkDirection;
             _solid = solid;
+            _restDistribution = restDistributuion;
             _distribution = distributuion;
             _height = height;
             _velocity = velocity;
@@ -72,15 +76,16 @@ namespace LatticeBoltzmannMethods
                 var velocity = float2.zero;
                 if (_solid[nodeIdx] == 1)
                 {
-                    // Handle center link.
+                    // Handle rest link.
                     {
-                        height += _distribution[9 * nodeIdx];
+                        height += _restDistribution[nodeIdx];
                     }
 
                     // Handle directional links.
+                    var nodeOffset = 8 * nodeIdx;
                     for (var linkIdx = 0; linkIdx < 8; linkIdx++)
                     {
-                        var linkDistribution = _distribution[9 * nodeIdx + linkIdx + 1];
+                        var linkDistribution = _distribution[nodeOffset + linkIdx];
                         height += linkDistribution;
                         velocity += linkDistribution * _linkDirection[linkIdx];
                     }
@@ -98,9 +103,11 @@ namespace LatticeBoltzmannMethods
                     {
                         height = _maxHeight;
                         var rescale = _maxHeight / height;
-                        for (var linkIdx = 0; linkIdx < 9; linkIdx++)
+                        _restDistribution[nodeIdx] *= rescale;
+                        var nodeOffset = 8 * nodeIdx;
+                        for (var linkIdx = 0; linkIdx < 8; linkIdx++)
                         {
-                            _distribution[9 * nodeIdx + linkIdx] *= rescale;
+                            _distribution[nodeOffset + linkIdx] *= rescale;
                         }
                     }
 

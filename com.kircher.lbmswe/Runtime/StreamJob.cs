@@ -19,8 +19,13 @@ namespace LatticeBoltzmannMethods
         [ReadOnly]
         private NativeArray<sbyte> _linkOffsetY;
         [ReadOnly]
+        private NativeArray<float> _lastRestDistribution;
+        [ReadOnly]
         private NativeArray<float> _lastDistribution;
 
+        [WriteOnly]
+        [NativeDisableParallelForRestriction]
+        private NativeArray<float> _restDistribution;
         [WriteOnly]
         [NativeDisableParallelForRestriction]
         private NativeArray<float> _distribution;
@@ -31,7 +36,9 @@ namespace LatticeBoltzmannMethods
             int latticeHeight,
             NativeArray<sbyte> linkOffsetX,
             NativeArray<sbyte> linkOffsetY,
+            NativeArray<float> lastRestDistribution,
             NativeArray<float> lastDistribution,
+            NativeArray<float> restDistribution,
             NativeArray<float> distribution)
         {
             _usePeriodicBoundary = usePreiodicBoundary;
@@ -39,7 +46,9 @@ namespace LatticeBoltzmannMethods
             _latticeHeight = latticeHeight;
             _linkOffsetX = linkOffsetX;
             _linkOffsetY = linkOffsetY;
+            _lastRestDistribution = lastRestDistribution;
             _lastDistribution = lastDistribution;
+            _restDistribution = restDistribution;
             _distribution = distribution;
         }
 
@@ -50,16 +59,16 @@ namespace LatticeBoltzmannMethods
             {
                 var nodeIdx = rowStartIdx + colIdx;
 
-                // Link 0
+                // Rest link.
                 {
-                    _distribution[9 * nodeIdx] = _lastDistribution[9 * nodeIdx];
+                    _restDistribution[nodeIdx] = _lastRestDistribution[nodeIdx];
                 }
 
                 // Remaining links.
-                for (var linkIdx = 1; linkIdx < 9; linkIdx++)
+                for (var linkIdx = 0; linkIdx < 8; linkIdx++)
                 {
-                    var propagatedColIdx = colIdx + _linkOffsetX[linkIdx - 1];
-                    var propagatedRowIdx = rowIdx + _linkOffsetY[linkIdx - 1];
+                    var propagatedColIdx = colIdx + _linkOffsetX[linkIdx];
+                    var propagatedRowIdx = rowIdx + _linkOffsetY[linkIdx];
 
                     if (_usePeriodicBoundary)
                     {
@@ -71,9 +80,9 @@ namespace LatticeBoltzmannMethods
 
                     if (propagatedColIdx >= 0 && propagatedColIdx < _latticeWidth && propagatedRowIdx >= 0 && propagatedRowIdx < _latticeHeight)
                     {
-                        var distributionToStream = _lastDistribution[9 * nodeIdx + linkIdx];
+                        var distributionToStream = _lastDistribution[8 * nodeIdx + linkIdx];
                         var propagatedIdx = propagatedRowIdx * _latticeWidth + propagatedColIdx;
-                        _distribution[9 * propagatedIdx + linkIdx] = distributionToStream;
+                        _distribution[8 * propagatedIdx + linkIdx] = distributionToStream;
                     }
                 }
             }
