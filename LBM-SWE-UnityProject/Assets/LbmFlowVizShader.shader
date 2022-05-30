@@ -47,11 +47,11 @@ Shader "Lattice Boltzmann Methods/Flow Viz"
             {
                 fixed4 col = tex2D(_MainTex, i.uv);
                 fixed2 velocity = 2.0 * col.rg - 1.0;
-                //return pow(_FreeChannelScale * col, _VelocityPower);
-
-                // Scale blue with the speed.
-                //col.b = length(velocity) / sqrt(2);
-                //return col.rbga;
+                // TODO: Options for different modes.
+                // Velocity viz...
+                //return pow(_FreeChannelScale * col, 10.0 * _VelocityPower);
+                // Speed viz...
+                //return float4(4.0 * length(velocity) / sqrt(2), 0.0, 0.0, 1.0);
 
                 // I... don't even know. Looks cool though!
                 fixed rescaledLength = pow(length(velocity), _VelocityPower);

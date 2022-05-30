@@ -678,14 +678,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _simulationStepTime: 0.016
   _latticeSpacingInMeters: 0.05
-  _latticeWidth: 300
-  _latticeHeight: 100
+  _latticeWidth: 100
+  _latticeHeight: 50
   _startingHeight: 0.15
   _relaxationTime: 0.51
   _bedSlope:
-    x: -0.00005
+    x: -0.0005
     y: 0
   _smagorinskyConstant: 0.18
+  _frictionCoefficient: 0.025
   _inletOutletBoundaryCondition: 0
   _fixupSolidHeights: 1
   _showMarkers: 0

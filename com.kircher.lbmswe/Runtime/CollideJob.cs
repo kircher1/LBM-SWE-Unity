@@ -10,14 +10,10 @@ namespace LatticeBoltzmannMethods
     [BurstCompile(FloatPrecision.Standard, FloatMode.Fast)]
     public struct CollideJob : IJobParallelFor
     {
-        #if LBM_APPLY_SHEAR_FORCES
-        // Found a table of manning's coefficients here: https://www.engineeringtoolbox.com/mannings-roughness-d_799.html
-        // private const float WallManningsCoefficient = 0.025f;
-        private const float BottomManningsCoefficient = 0.025f;
-        #endif
-
         [ReadOnly]
         private float _deltaT;
+        [ReadOnly]
+        private float _totalT;
         [ReadOnly]
         private int _latticeWidth;
         [ReadOnly]
@@ -32,6 +28,8 @@ namespace LatticeBoltzmannMethods
         private float _gravitationalForce;
         [ReadOnly]
         private float2 _bedSlope;
+        [ReadOnly]
+        private float _frictionCoefficient;
         [ReadOnly]
         private NativeArray<float2> _linkDirection;
         [ReadOnly]
@@ -61,6 +59,7 @@ namespace LatticeBoltzmannMethods
 
         public CollideJob(
             float deltaT,
+            float totalT,
             int latticeWidth,
             int latticeHeight,
             float e,
@@ -68,6 +67,7 @@ namespace LatticeBoltzmannMethods
             float relaxationTime,
             float gravitationalForce,
             float2 bedSlope,
+            float frictionCoefficient,
             NativeArray<float2> linkDirection,
             NativeArray<sbyte> linkOffsetX,
             NativeArray<sbyte> linkOffsetY,
@@ -81,6 +81,7 @@ namespace LatticeBoltzmannMethods
             NativeArray<float> inverseEddyRelaxationTime)
         {
             _deltaT = deltaT;
+            _totalT = totalT;
             _latticeWidth = latticeWidth;
             _latticeHeight = latticeHeight;
             _e = e;
@@ -88,6 +89,7 @@ namespace LatticeBoltzmannMethods
             _relaxationTime = relaxationTime;
             _gravitationalForce = gravitationalForce;
             _bedSlope = bedSlope;
+            _frictionCoefficient = frictionCoefficient;
             _linkDirection = linkDirection;
             _linkOffsetX = linkOffsetX;
             _linkOffsetY = linkOffsetY;
@@ -201,7 +203,9 @@ namespace LatticeBoltzmannMethods
                 var centeredVelocity = currentVelocity; // 0.5f * (currentVelocity + neighborVelocity);
                 var velocitySq = centeredVelocity * math.length(centeredVelocity);
 
-                var chezyCoefficient = math.pow(centeredHeight, 1.0f / 6.0f) / BottomManningsCoefficient;
+                var frictionCoefficient = _frictionCoefficient * math.pow(noise.cnoise(new float2(2.0f * _totalT, 0.0f) - new float2(colIdx, rowIdx) / 2.0f), 4.0f);
+                //var frictionCoefficient = _frictionCoefficient;
+                var chezyCoefficient = math.pow(centeredHeight, 1.0f / 6.0f) / frictionCoefficient;
                 var bedFrictionCoefficient = _gravitationalForce / (chezyCoefficient * chezyCoefficient);
                 var bedShearStress = velocitySq * bedFrictionCoefficient;
 

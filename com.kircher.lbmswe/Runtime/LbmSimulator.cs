@@ -53,6 +53,10 @@ namespace LatticeBoltzmannMethods
         private float _smagorinskyConstant = 0.18f;
 
         [SerializeField]
+        [Range(0.0f, 1.0f)]
+        private float _frictionCoefficient = 0.025f;
+
+        [SerializeField]
         private InletOutletBoundaryCondition _inletOutletBoundaryCondition = InletOutletBoundaryCondition.ZouHe;
 
         /// <summary>
@@ -143,6 +147,7 @@ namespace LatticeBoltzmannMethods
         private Texture2D _heightTexture;
         private Texture2D _maskTexture;
 
+        private float _totalSimulationTime;
         private float _e;
         private float _inverseE;
         private float _maxHeight;
@@ -213,6 +218,7 @@ namespace LatticeBoltzmannMethods
         private void InitializeSimData()
         {
             InitializeNativeArrays();
+            ComputePerFrameTerms();
 
             var startupLog = "LbmSimulator ---\r\n";
 
@@ -239,7 +245,7 @@ namespace LatticeBoltzmannMethods
                 //_solid[(_latticeHeight - 1) * _latticeWidth] = 1;
                 //_solid[(_latticeHeight - 1) * _latticeWidth + _latticeWidth - 1] = 1;
 
-                _solidResult = new NativeArray<byte>(_latticeWidth* _latticeHeight, Allocator.Persistent);
+                _solidResult = new NativeArray<byte>(_latticeWidth * _latticeHeight, Allocator.Persistent);
                 NativeArray<byte>.Copy(_solid, _solidResult);
             }
             else
@@ -247,25 +253,17 @@ namespace LatticeBoltzmannMethods
                 startupLog += "Solid nodes previously set.\r\n";
                 NativeArray<byte>.Copy(_solidResult, _solid);
             }
-
-            // Compute per-simulation terms.
-            _e = _latticeSpacingInMeters / _simulationStepTime;
-            _inverseE = 1.0f / _e;
-            MaxSpeed = math.abs(_e) - 0.001f;
-            _maxHeight = _e * _e / GravitationalForce - 0.001f;
             startupLog += $"Max speed: {MaxSpeed}, Max height: {_maxHeight}\r\n";
+            startupLog += $"Initial velocity: {_initialVelocity}\r\n";
+            startupLog += $"Initial height: {_initialHeight}\r\n";
 
             // Set starting height uniformly.
-            _initialHeight = math.min(_maxHeight, _startingHeight);
-            startupLog += $"Initial height: {_initialHeight}\r\n";
             for (var nodeIdx = 0; nodeIdx < _height.Length; nodeIdx++)
             {
                 _height[nodeIdx] = _solid[nodeIdx] * _initialHeight;
             }
 
             // Set initial velocity, some factor of the max speed.
-            _initialVelocity = new float2((_startingHeight / _maxHeight) * MaxSpeed / math.SQRT2, 0.0f);
-            startupLog += $"Initial velocity: {_initialVelocity}\r\n";
             for (var nodeIdx = 0; nodeIdx < _velocity.Length; nodeIdx++)
             {
                 _velocity[nodeIdx] = _solid[nodeIdx] * _initialVelocity;
@@ -297,8 +295,25 @@ namespace LatticeBoltzmannMethods
             Debug.Log(startupLog);
         }
 
+        private void ComputePerFrameTerms()
+        {
+            _e = _latticeSpacingInMeters / _simulationStepTime;
+            _inverseE = 1.0f / _e;
+            _maxHeight = _e * _e / GravitationalForce - 0.001f;
+            MaxSpeed = math.abs(_e) - 0.001f;
+            MaxSpeed = math.min(MaxSpeed, math.sqrt(GravitationalForce * _maxHeight));
+            _initialVelocity = new float2((_startingHeight / _maxHeight) * MaxSpeed / math.SQRT2, 0.0f);
+            _initialHeight = math.min(_maxHeight, _startingHeight);
+            _totalSimulationTime += _simulationStepTime;
+        }
+
         private void Update()
         {
+            ComputePerFrameTerms();
+            var inverseESq = 1.0f / (_e * _e);
+            var smagorinskyConstantSq = _smagorinskyConstant * _smagorinskyConstant;
+            var relaxationTimeSq = _relaxationTime * _relaxationTime;
+
             if (_lastJobHandles != null)
             {
                 _lastJobHandles.Value.Item1.Complete();
@@ -321,11 +336,6 @@ namespace LatticeBoltzmannMethods
                 DumpStats(); // TODO: Jobify/move to different component.
             }
 
-            // Compute per-frame terms.
-            var inverseESq = 1.0f / (_e * _e);
-            var smagorinskyConstantSq = _smagorinskyConstant * _smagorinskyConstant;
-            var relaxationTimeSq = _relaxationTime * _relaxationTime;
-
             // Setup jobs.
             var usePeriodicBoundary = _inletOutletBoundaryCondition == InletOutletBoundaryCondition.Periodic;
             var computeEddyRelaxationTimeJob =
@@ -345,6 +355,7 @@ namespace LatticeBoltzmannMethods
             var collideJob =
                 new CollideJob(
                     _simulationStepTime,
+                    _totalSimulationTime,
                     _latticeWidth,
                     _latticeHeight,
                     _e,
@@ -352,6 +363,7 @@ namespace LatticeBoltzmannMethods
                     _relaxationTime,
                     GravitationalForce,
                     _bedSlope,
+                    _frictionCoefficient,
                     _linkDirection,
                     _linkOffsetX,
                     _linkOffsetY,
