@@ -1,51 +1,52 @@
+using System.Runtime.CompilerServices;
 using Unity.Mathematics;
 
 namespace LatticeBoltzmannMethods
 {
     public static class SamplingMath
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void GenerateLinearSampleUvCoords(
             float2 uv,
-            int textureWidth,
-            int textureHeight,
+            int2 dimensionInPixels,
+            float2 halfPixelSizeInUVSpace,
             out int upperLeftIdx,
             out int lowerLeftIdx,
             out int upperRightIdx,
             out int lowerRightIdx,
             out float2 weights)
         {
-            var pixelSize = new float2(textureWidth - 1, textureHeight - 1);
-            var halfTexelSize = new float2(-0.5f, -0.5f) / pixelSize;
-            var upperLeft = math.saturate(uv + halfTexelSize);
-            var lowerRight = math.saturate(uv - halfTexelSize);
+            var upperLeft = uv - halfPixelSizeInUVSpace;
+            var upperLeftRowCol = (int2)math.round((dimensionInPixels - 1) * math.saturate(upperLeft));
+            var texelCoord = uv - upperLeftRowCol / (float2)dimensionInPixels - halfPixelSizeInUVSpace;
+            weights = math.saturate(texelCoord * dimensionInPixels);
 
-            var upperLeftColRowIdx = (int2)math.round(pixelSize * upperLeft);
-            var lowerRightColRowIdx = (int2)math.round(pixelSize * lowerRight);
-
-            upperLeftIdx = upperLeftColRowIdx.y * textureWidth + upperLeftColRowIdx.x;
-            lowerLeftIdx = lowerRightColRowIdx.y * textureWidth + upperLeftColRowIdx.x;
-            upperRightIdx = lowerRightColRowIdx.y * textureWidth + lowerRightColRowIdx.x;
-            lowerRightIdx = lowerRightColRowIdx.y * textureWidth + lowerRightColRowIdx.x;
-
-            weights = math.saturate((uv - lowerRight) / (2.0f * halfTexelSize));
+            // And compute the indices for looking up the corners.
+            var lowerRightRowCol = math.min((dimensionInPixels - 1), upperLeftRowCol + 1);
+            upperLeftIdx = upperLeftRowCol.y * dimensionInPixels.x + upperLeftRowCol.x;
+            upperRightIdx = upperLeftRowCol.y * dimensionInPixels.x + lowerRightRowCol.x;
+            lowerLeftIdx = lowerRightRowCol.y * dimensionInPixels.x + upperLeftRowCol.x;
+            lowerRightIdx = lowerRightRowCol.y * dimensionInPixels.x + lowerRightRowCol.x;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float LinearBlend(float upperLeft, float lowerLeft, float upperRight, float lowerRight, float2 weights)
         {
             return
                 math.lerp(
-                    math.lerp(upperLeft, lowerLeft, weights.x),
-                    math.lerp(upperRight, lowerRight, weights.x),
-                    weights.y);
+                    math.lerp(upperLeft, lowerLeft, weights.y),
+                    math.lerp(upperRight, lowerRight, weights.y),
+                    weights.x);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float2 LinearBlend(float2 upperLeft, float2 lowerLeft, float2 upperRight, float2 lowerRight, float2 weights)
         {
             return
                 math.lerp(
-                    math.lerp(upperLeft, lowerLeft, weights.x),
-                    math.lerp(upperRight, lowerRight, weights.x),
-                    weights.y);
+                    math.lerp(upperLeft, lowerLeft, weights.y),
+                    math.lerp(upperRight, lowerRight, weights.y),
+                    weights.x);
         }
     }
 }

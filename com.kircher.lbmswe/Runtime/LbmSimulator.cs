@@ -24,9 +24,11 @@ namespace LatticeBoltzmannMethods
         [SerializeField]
         [Range(0.001f, 1.0f)]
         private float _simulationStepTime = 0.016f;
+        public float SimulationStepTime => _simulationStepTime;
 
         [SerializeField]
         private float _latticeSpacingInMeters = 0.05f;
+        public float LatticeSpacingInMeters => _latticeSpacingInMeters;
 
         [SerializeField]
         private int _latticeWidth = 65;
@@ -37,6 +39,10 @@ namespace LatticeBoltzmannMethods
         private int _latticeHeight = 193;
 
         public int LatticeHeight => _latticeHeight;
+
+        internal float2 HalfLatticeSpacingInUVSpace;
+
+        public int2 LatticeDimension { get; private set; }
 
         [SerializeField]
         private float _startingHeight = 0.1f;
@@ -182,6 +188,8 @@ namespace LatticeBoltzmannMethods
 
         private void OnEnable()
         {
+            LatticeDimension = new int2(LatticeWidth, LatticeHeight);
+            HalfLatticeSpacingInUVSpace = 0.5f / (float2)LatticeDimension;
             InitializeLinkData(out _linkDirection, out _linkOffsetX, out _linkOffsetY);
 
             _markerTimer = _markerFrequency;

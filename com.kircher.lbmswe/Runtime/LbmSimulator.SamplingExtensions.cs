@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Unity.Mathematics;
 
 namespace LatticeBoltzmannMethods
@@ -8,12 +9,13 @@ namespace LatticeBoltzmannMethods
         /// Sample the veloicty at the specified UV coordinate.
         /// UV-space is normalized between the lattice edges.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float2 SampleVelocity(this LbmSimulator lbmSimulator, float2 uv)
         {
             SamplingMath.GenerateLinearSampleUvCoords(
                 uv,
-                lbmSimulator.LatticeWidth,
-                lbmSimulator.LatticeHeight,
+                lbmSimulator.LatticeDimension,
+                lbmSimulator.HalfLatticeSpacingInUVSpace,
                 out var upperLeftIdx,
                 out var lowerLeftIdx,
                 out var upperRightIdx,
@@ -30,34 +32,36 @@ namespace LatticeBoltzmannMethods
         /// Sample the solid mask at the specified UV coordinate. 0.0 is liquid, 1.0 is solid.
         /// UV-space is normalized between the lattice edges.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float SampleSolid(this LbmSimulator lbmSimulator, float2 uv)
         {
             SamplingMath.GenerateLinearSampleUvCoords(
                 uv,
-                lbmSimulator.LatticeWidth,
-                lbmSimulator.LatticeHeight,
+                lbmSimulator.LatticeDimension,
+                lbmSimulator.HalfLatticeSpacingInUVSpace,
                 out var upperLeftIdx,
                 out var lowerLeftIdx,
                 out var upperRightIdx,
                 out var lowerRightIdx,
                 out float2 weights);
-            var upperLeft = 1.0f - lbmSimulator.Solid[upperLeftIdx];
-            var lowerLeft = 1.0f - lbmSimulator.Solid[lowerLeftIdx];
-            var upperRight = 1.0f - lbmSimulator.Solid[upperRightIdx];
-            var lowerRight = 1.0f - lbmSimulator.Solid[lowerRightIdx];
-            return SamplingMath.LinearBlend(upperLeft, lowerLeft, upperRight, lowerRight, weights);
+            var upperLeft = lbmSimulator.Solid[upperLeftIdx];
+            var lowerLeft = lbmSimulator.Solid[lowerLeftIdx];
+            var upperRight = lbmSimulator.Solid[upperRightIdx];
+            var lowerRight = lbmSimulator.Solid[lowerRightIdx];
+            return 1.0f - SamplingMath.LinearBlend(upperLeft, lowerLeft, upperRight, lowerRight, weights);
         }
 
         /// <summary>
         /// Sample the height at the specified UV coordinate.
         /// UV-space is normalized between the lattice edges.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float SampleHeight(this LbmSimulator lbmSimulator, float2 uv)
         {
             SamplingMath.GenerateLinearSampleUvCoords(
                 uv,
-                lbmSimulator.LatticeWidth,
-                lbmSimulator.LatticeHeight,
+                lbmSimulator.LatticeDimension,
+                lbmSimulator.HalfLatticeSpacingInUVSpace,
                 out var upperLeftIdx,
                 out var lowerLeftIdx,
                 out var upperRightIdx,
